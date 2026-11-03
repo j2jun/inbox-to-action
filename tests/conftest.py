@@ -35,3 +35,11 @@ def as_due(value):
     if "T" in value:
         return datetime.fromisoformat(value).astimezone(TZ)
     return date.fromisoformat(value)
+
+USER = "alex@acme.example"
+
+
+def make_email(body="", subject="Hi", to=(USER,), cc=(), headers=None, from_addr="someone@acme.example", message_id="<t@x>"):
+    from inbox_to_action.models import Email
+    return Email(message_id=message_id, subject=subject, from_name="Someone", from_addr=from_addr,
+                 to=list(to), cc=list(cc), date=NOW, headers=headers or {}, body=body, ics=None)
