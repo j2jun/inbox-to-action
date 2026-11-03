@@ -13,7 +13,10 @@
     "P4": "cc'd only, and the ask is aimed at others"
   },
   "emails": {
-    "01_zoom_invite.eml":        {"tasks": [{"type": "Call", "platform": "Zoom", "title_has": ["Q4", "roadmap"], "due": "2026-11-04T10:00:00-08:00", "priority": "P2"}]},
+    "01_zoom_invite.eml":        {"tasks": [
+      {"type": "Call", "platform": "Zoom", "title_has": ["Q4", "roadmap"], "due": "2026-11-04T10:00:00-08:00", "priority": "P2"},
+      {"type": "Action", "title_has": ["Q1", "bets"], "due": "2026-11-04T10:00:00-08:00", "priority": "P2"}
+    ]},
     "02_google_meet_invite.eml": {"tasks": [{"type": "Call", "platform": "Meet", "title_has": ["Vendor", "sync"], "due": "2026-11-04T13:00:00-08:00", "priority": "P2", "uid": "7k2v9q1northwind@google.com"}]},
     "03_google_meet_update.eml": {"updates_uid": "7k2v9q1northwind@google.com", "tasks": [{"type": "Call", "platform": "Meet", "title_has": ["Vendor", "sync"], "due": "2026-11-05T11:00:00-08:00", "priority": "P2"}]},
     "04_teams_invite.eml":       {"tasks": [{"type": "Call", "platform": "Teams", "title_has": ["Hiring", "debrief"], "due": "2026-11-02T15:00:00-08:00", "priority": "P1", "uid": "040000008200E00074C5B7101A82E00800000000D1A2B3C4"}]},
