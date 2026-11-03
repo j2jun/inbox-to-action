@@ -190,3 +190,12 @@ def test_personal_zoom_room_is_not_a_shared_key(load):
     run(a, store, no_ai := (lambda req: {"content": [{"type": "tool_use", "input": {"tasks": []}}]}))
     run(b, store, no_ai)
     assert len([t for t in store.list_open() if t.type == "Call"]) == 2
+
+
+def test_link_key_cannot_be_squatted_by_another_sender(load):
+    store = MemoryStore()
+    squat = _no_ics(load, "02")
+    squat.from_addr, squat.message_id = "attacker@evil.example", "<squat@x>"
+    run(squat, store)
+    real = run(_no_ics(load, "02"), store)
+    assert [t.platform for t in real.created] == ["Meet"]
