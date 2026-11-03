@@ -8,7 +8,18 @@ Turns emails into a prioritized to-do list in Notion, so less time goes to inbox
 Gmail (new email) ──► Zapier trigger ──► Python (classify, extract, prioritize) ──► Notion task database
 ```
 
-> Status: built and tested locally (133 tests, offline eval 100%). Deployment needs your accounts: see **Setup**.
+> Status: built and tested locally (164 tests, offline eval 100%). Deployment needs your accounts: see **Setup**.
+
+## The Today page
+
+One connected timeline (Overdue → Today → Tomorrow → This week → Later → Someday). Calls are diamonds with a **Join** or **Call** button, and the P-label shows why each task got its priority. Tick to finish (with Undo), click a P-label to change priority, Snooze a task, or type `Call Priya Fri 3pm p1` to add one. Every change syncs to Notion.
+
+<p>
+  <img src="docs/images/today-desktop.png" alt="Today page on desktop: a dark timeline of tasks grouped into Overdue, Today, Tomorrow and This week, with P1–P3 priority labels and violet Join and Call buttons on meeting tasks" width="68%">
+  <img src="docs/images/today-mobile.png" alt="Today page on a phone: the same timeline in one column, with the action buttons under each task" width="28%">
+</p>
+
+<sub>Screenshots use the fictional sample emails in <code>samples/</code>.</sub>
 
 ---
 
