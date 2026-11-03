@@ -8,7 +8,7 @@ Turns emails into a prioritized to-do list in Notion, so less time goes to inbox
 Gmail (new email) ──► Zapier trigger ──► Python (classify, extract, prioritize) ──► Notion task database
 ```
 
-> Status: requirements draft. Nothing is built yet.
+> Status: built and tested locally (133 tests, offline eval 100%). Deployment needs your accounts: see **Setup**.
 
 ---
 
@@ -119,12 +119,58 @@ Gmail (new email) ──► Zapier trigger ──► Python (classify, extract, 
 
 ---
 
-## Project layout (planned)
+## Try it locally (no accounts needed)
+
+```bash
+python3 -m pytest -q                       # 133 tests, no network
+python3 -m inbox_to_action.eval samples/   # accuracy vs samples/expected.json
+python3 -m inbox_to_action.dev             # Today page on http://localhost:8000, password: inbox-to-action-dev
+```
+
+## Setup
+
+### 1. Notion
+1. Create an integration at notion.so/my-integrations and copy its token.
+2. Share an empty Notion page with the integration and copy the page's id from its URL.
+3. Create the database: `NOTION_TOKEN=… python3 -m inbox_to_action.notion setup <page_id>`. It prints the database id.
+4. In Notion, add a **Calls** calendar view (filter Type = Call) and an **All tasks** table view.
+
+### 2. Environment variables (Vercel project settings)
+| Name | Value |
+|---|---|
+| `NOTION_TOKEN` | integration token |
+| `NOTION_DATABASE_ID` | printed by step 1.3 |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `WEBHOOK_SECRET` | long random string (also used in Zapier) |
+| `APP_PASSWORD` | your Today page password, 12+ characters |
+| `SESSION_SECRET` | long random string (`python3 -c "import secrets;print(secrets.token_hex(32))"`) |
+| `USER_EMAIL` | your Gmail address |
+| `VIP_EMAILS` | comma-separated important senders |
+| `TIMEZONE` | e.g. `America/Los_Angeles` |
+
+### 3. Deploy
+`npx vercel` for a preview, then `npx vercel --prod`. The function lives in `api/index.py`, and the page is served from `public/`.
+
+### 4. Zapier
+1. Trigger: **Gmail → New Email** (or *New Email Matching Search*, e.g. `label:inbox -category:promotions`).
+2. Action: **Webhooks by Zapier → POST** to `https://<your-app>/webhook/email`.
+   - Header `X-Webhook-Secret: <WEBHOOK_SECRET>`.
+   - Payload type **JSON**, data: `message_id`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body` mapped from the Gmail fields (`body` = plain body).
+   - Optional: `list_unsubscribe` and `precedence` if your Gmail step exposes those headers.
+   - Calendar attachments: if the Gmail step exposes the `.ics` file, use payload type **Form** with a `payload` field (the JSON above) and a file field named `ics`. Without it, calls are still detected from the join link and the time in the email text.
+3. Test with an email containing a Zoom link and a time. It should appear in Notion and on the Today page.
+
+### Live accuracy check
+`ANTHROPIC_API_KEY=… python3 -m inbox_to_action.eval samples/ --live` runs the samples against the real model.
+
+## Project layout
 
 ```
-inbox-to-action/
-├── README.md
-├── samples/          # sample emails for local testing
-├── inbox_to_action/  # Python package
-└── tests/
+inbox_to_action/   pipeline (parse, dates, ics, skip, calls, tools, priority, ai, pipeline),
+                   storage (store, notion), web (auth, quickadd, web, dev), eval
+api/index.py       Vercel entry point
+public/            Today page (Aurora)
+samples/           sample emails + expected.json answer key
+tests/             pytest suite + recorded AI responses
+docs/superpowers/  design spec, mockup and build plan
 ```
