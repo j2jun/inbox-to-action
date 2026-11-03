@@ -1,4 +1,5 @@
 """Turn a call or meeting invite into a Call task. Platforms are one table row each."""
+import hashlib
 import re
 from datetime import datetime
 
@@ -33,13 +34,18 @@ def _phone(text: str) -> str | None:
     return "+" + (digits if len(digits) == 11 else "1" + digits)
 
 
+def _short(value: str) -> str:
+    # Keep keys well under Notion's 2000-char text limit so lookups always match what was stored.
+    return value if len(value) <= 300 else "sha256-" + hashlib.sha256(value.encode()).hexdigest()
+
+
 def _link_key(link: str | None, sender: str) -> str | None:
     # Without an .ics, a meeting-specific join link ties updates and cancels to the original task.
     # Personal rooms (zoom.us/my/…) are reused across meetings, so they never become a key.
     if not link or re.search(r"zoom\.us/my/", link, re.I):
         return None
     # Bound to the sender so another sender can't claim a meeting's link first.
-    return f"link:{sender.lower()}:" + link.split("?")[0].split("#")[0]
+    return f"link:{sender.lower()[:254]}:" + _short(link.split("?")[0].split("#")[0])
 
 
 def detect_call(email: Email, now: datetime) -> Task | str | None:
@@ -77,7 +83,7 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
         from_name=email.from_name,
         from_addr=email.from_addr,
         message_id=email.message_id,
-        key=f"uid:{email.from_addr.lower()}:{ev.uid}" if ev else _link_key(link, email.from_addr) or email.message_id,
+        key=f"uid:{email.from_addr.lower()[:254]}:{_short(ev.uid)}" if ev else _link_key(link, email.from_addr) or email.message_id,
         uid=ev.uid if ev else None,
         sequence=ev.sequence if ev else 0,
         status="Cancelled" if cancelled else "To do",

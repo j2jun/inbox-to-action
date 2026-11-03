@@ -21,6 +21,8 @@ def _html_to_text(s: str) -> str:
 
 def _angle(message_id: str) -> str:
     # Message-IDs always look like "<…>", so they can never collide with "uid:" / "link:" call keys.
+    if len(message_id) > 300:  # oversized IDs would be truncated by Notion (2000 chars) and never match again
+        return f"<{hashlib.sha256(message_id.encode()).hexdigest()[:32]}@long-id>"
     return message_id if message_id.startswith("<") and message_id.endswith(">") else f"<{message_id.strip('<>')}>"
 
 

@@ -217,3 +217,16 @@ def test_message_id_cannot_mimic_a_call_key(load):
     p = {"message_id": "link:calendar-notification@google.com:https://meet.google.com/xqv-hkdp-rme",
          "from": "x <x@y.z>", "to": USER, "subject": "s", "date": "Mon, 02 Nov 2026 08:45:00 -0800", "body": "hi"}
     assert email_from_payload(p, None).message_id.startswith("<")
+
+
+def test_huge_ids_are_shortened_stably(load):
+    from inbox_to_action.calls import detect_call
+    from inbox_to_action.parse import email_from_payload
+    p = {"message_id": "<" + "a" * 5000 + ">", "from": "x <x@y.z>", "to": USER, "subject": "s",
+         "date": "Mon, 02 Nov 2026 08:45:00 -0800", "body": "hi"}
+    m1, m2 = email_from_payload(p, None).message_id, email_from_payload(p, None).message_id
+    assert m1 == m2 and len(m1) < 100
+    e = load("02")
+    e.ics = e.ics.replace("UID:7k2v9q1northwind@google.com", "UID:" + "u" * 5000)
+    k1, k2 = detect_call(e, NOW).key, detect_call(e, NOW).key
+    assert k1 == k2 and len(k1) < 500

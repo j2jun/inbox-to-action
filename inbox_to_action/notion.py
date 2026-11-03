@@ -105,7 +105,7 @@ def page_to_task(page: dict) -> Task:
         source_email=(p.get("Source email") or {}).get("url"),
         source_item=(p.get("Source item") or {}).get("url"),
         key=key,
-        uid=key.split(":", 2)[2] if key.startswith("uid:") else None,
+        uid=parts[2] if key.startswith("uid:") and len(parts := key.split(":", 2)) == 3 else None,
         status=sel("Status") or "To do",
         priority=sel("Priority") or "P3",
         reason=_plain(p.get("Why this priority", {})),

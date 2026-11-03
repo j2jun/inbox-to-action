@@ -127,3 +127,8 @@ def test_comma_in_sender_name_round_trips():
     t = Task(title="x", type="Call", from_name="Okafor, Ben", from_addr="ben@acme.example", key="<u1@x>", page_id="p9")
     back = page_to_task(fake_page(task_to_props(t), "p9"))
     assert (back.from_name, back.from_addr) == ("Okafor, Ben", "ben@acme.example")
+
+
+def test_malformed_uid_key_does_not_crash():
+    t = Task(title="x", type="Call", key="uid:truncated", page_id="p7")
+    assert page_to_task(fake_page(task_to_props(t), "p7")).uid is None
