@@ -34,3 +34,13 @@ def test_parse_datetime_text(text, expected):
 def test_parse_due_text(text, expected):
     got = parse_due_text(text, NOW)
     assert got == expected and type(got) is type(expected)
+
+
+@pytest.mark.parametrize("text", ["due Nov 31", "expires on February 30, 2026", "by Friday at 7:75pm"])
+def test_impossible_due_returns_none_not_crash(text):
+    got = parse_due_text(text, NOW)
+    assert got is None or got == date(2026, 11, 6)  # bad minutes drop the time, keep Friday
+
+
+def test_impossible_datetime_returns_none():
+    assert parse_datetime_text("Nov 31, 2026 10:00 AM", NOW) is None

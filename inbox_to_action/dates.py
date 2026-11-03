@@ -32,7 +32,10 @@ def _with_time(d: date, text: str, now: datetime) -> date | datetime:
     m = _AT_TIME.search(text)
     if not m:
         return d
-    return datetime.combine(d, time(_hour(m.group(1), m.group(3)), int(m.group(2) or 0)), now.tzinfo)
+    try:
+        return datetime.combine(d, time(_hour(m.group(1), m.group(3)), int(m.group(2) or 0)), now.tzinfo)
+    except ValueError:  # "13pm" and the like: keep the date, drop the time
+        return d
 
 
 def parse_datetime_text(text: str, now: datetime) -> datetime | None:
@@ -41,11 +44,22 @@ def parse_datetime_text(text: str, now: datetime) -> datetime | None:
     if not m:
         return None
     mon, day, year, hh, mm, ap1, ap2 = m.groups()
-    return datetime(int(year), _month(mon), int(day), _hour(hh, ap1 or ap2), int(mm), tzinfo=now.tzinfo)
+    try:
+        return datetime(int(year), _month(mon), int(day), _hour(hh, ap1 or ap2), int(mm), tzinfo=now.tzinfo)
+    except ValueError:  # "Nov 31", "25:00"
+        return None
 
 
 def parse_due_text(text: str, now: datetime) -> date | datetime | None:
-    """A due date from phrases like 'by Friday', 'Due: Nov 10', '03/Nov/26'. Datetime only if a time is given."""
+    """A due date from phrases like 'by Friday', 'Due: Nov 10', '03/Nov/26'. Datetime only if a time is given.
+    Impossible dates ("Nov 31") give None rather than an exception."""
+    try:
+        return _parse_due(text, now)
+    except ValueError:
+        return None
+
+
+def _parse_due(text: str, now: datetime) -> date | datetime | None:
     if m := _FULL_DATE.search(text):
         return _with_time(date(int(m.group(3)), _month(m.group(1)), int(m.group(2))), text, now)
     if m := _SLASH_DATE.search(text):
