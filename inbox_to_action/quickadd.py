@@ -8,7 +8,8 @@ from .models import Task
 _DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 _PRIO = re.compile(r"\bp([1-4])\b", re.I)
 _TIME = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", re.I)
-_DAY = re.compile(r"\b(today|tomorrow|(mon|tue|wed|thu|fri|sat|sun)[a-z]*)\b", re.I)
+_DAY = re.compile(r"\b(today|tomorrow|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs?|rsday)?|fri(?:day)?"
+                  r"|sat(?:urday)?|sun(?:day)?)\b", re.I)
 
 
 def _next_weekday(now: datetime, idx: int) -> date:

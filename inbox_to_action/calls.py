@@ -33,6 +33,14 @@ def _phone(text: str) -> str | None:
     return "+" + (digits if len(digits) == 11 else "1" + digits)
 
 
+def _link_key(link: str | None) -> str | None:
+    # Without an .ics, a meeting-specific join link ties updates and cancels to the original task.
+    # Personal rooms (zoom.us/my/…) are reused across meetings, so they never become a key.
+    if not link or re.search(r"zoom\.us/my/", link, re.I):
+        return None
+    return "link:" + link.split("?")[0].split("#")[0]
+
+
 def detect_call(email: Email, now: datetime) -> Task | str | None:
     ev = parse_ics(email.ics, now.tzinfo) if email.ics else None
     platform, link = None, None
@@ -55,7 +63,7 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
     start = ev.start if ev else parse_datetime_text(email.body, now)
     if start is None:
         return None
-    cancelled = bool(ev and ev.method == "CANCEL")
+    cancelled = bool(ev and ev.method == "CANCEL") or bool(re.match(r"(?i)\s*cancel+ed( event)?\s*:", email.subject))
     if start < now and not cancelled:
         return "invite already in the past"
     return Task(
@@ -68,7 +76,7 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
         from_name=email.from_name,
         from_addr=email.from_addr,
         message_id=email.message_id,
-        key=ev.uid if ev else email.message_id,
+        key=ev.uid if ev else _link_key(link) or email.message_id,
         uid=ev.uid if ev else None,
         sequence=ev.sequence if ev else 0,
         status="Cancelled" if cancelled else "To do",

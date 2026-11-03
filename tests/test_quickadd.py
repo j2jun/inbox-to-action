@@ -28,3 +28,15 @@ def test_defaults(text, due, prio):
 def test_blank_is_rejected():
     with pytest.raises(ValueError):
         parse_quick_add("  p1  ", NOW)
+
+
+@pytest.mark.parametrize("text,title,due", [
+    ("Monitor dashboards", "Monitor dashboards", None),
+    ("Month-end close", "Month-end close", None),
+    ("Buy wedding gift", "Buy wedding gift", None),
+    ("Call friend tomorrow", "Call friend", date(2026, 11, 3)),
+    ("Review budget tues", "Review budget", date(2026, 11, 3)),
+])
+def test_day_words_need_whole_word(text, title, due):
+    t = parse_quick_add(text, NOW)
+    assert (t.title, t.due) == (title, due)

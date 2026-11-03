@@ -10,7 +10,7 @@ _DOW = r"(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?"
 
 # "Nov 4, 2026 10:00 AM", "Tuesday, November 3, 2026, 8:00 - 8:45 AM", "… 1:00 PM - 2:00 PM"
 _DATETIME = re.compile(
-    _DOW + _MON + r"\s+(\d{1,2}),?\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(am|pm)?"
+    _DOW + _MON + r"\s+(\d{1,2}),?\s+(\d{4}),?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"
     r"(?:\s*[-–]\s*\d{1,2}:\d{2}\s*(am|pm))?", re.I)
 _FULL_DATE = re.compile(_DOW + _MON + r"\s+(\d{1,2}),?\s+(\d{4})", re.I)
 _SLASH_DATE = re.compile(r"\b(\d{1,2})/([a-z]{3})/(\d{2})\b", re.I)
@@ -40,12 +40,12 @@ def _with_time(d: date, text: str, now: datetime) -> date | datetime:
 
 def parse_datetime_text(text: str, now: datetime) -> datetime | None:
     """First explicit date + time in the text, in now's timezone."""
-    m = _DATETIME.search(text)
+    m = next((m for m in _DATETIME.finditer(text) if m.group(5) or m.group(6)), None)  # need :MM or am/pm
     if not m:
         return None
     mon, day, year, hh, mm, ap1, ap2 = m.groups()
     try:
-        return datetime(int(year), _month(mon), int(day), _hour(hh, ap1 or ap2), int(mm), tzinfo=now.tzinfo)
+        return datetime(int(year), _month(mon), int(day), _hour(hh, ap1 or ap2), int(mm or 0), tzinfo=now.tzinfo)
     except ValueError:  # "Nov 31", "25:00"
         return None
 

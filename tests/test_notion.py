@@ -109,3 +109,21 @@ def test_setup_schema():
     assert opts("Status") == ["To do", "Done", "Cancelled"]
     assert opts("Platform") == ["Zoom", "Meet", "Teams", "Webex", "Phone", "Other"]
     assert opts("Priority") == ["P1", "P2", "P3", "P4"]
+
+
+def test_update_with_pipeline_field_set():
+    """The exact fields pipeline.process sends for an invite update (review: Critical 1)."""
+    http = FakeHttp((200, fake_page(task_to_props(CALL), "p1"), {}))
+    NotionStore("t", "db1", http=http).update(
+        "p1", title="Vendor sync", due=CALL.due, status="Cancelled", join_link=CALL.join_link, phone=None,
+        sequence=1, priority="P2", reason="P2: due within 7 days")
+    props = http.calls[0][2]["properties"]
+    assert props["Task"]["title"][0]["text"]["content"] == "Vendor sync"
+    assert props["Status"] == {"select": {"name": "Cancelled"}}
+    assert "From" not in props and "Message ID" not in props
+
+
+def test_comma_in_sender_name_round_trips():
+    t = Task(title="x", type="Call", from_name="Okafor, Ben", from_addr="ben@acme.example", key="u1", page_id="p9")
+    back = page_to_task(fake_page(task_to_props(t), "p9"))
+    assert (back.from_name, back.from_addr) == ("Okafor, Ben", "ben@acme.example")

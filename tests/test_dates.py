@@ -44,3 +44,7 @@ def test_impossible_due_returns_none_not_crash(text):
 
 def test_impossible_datetime_returns_none():
     assert parse_datetime_text("Nov 31, 2026 10:00 AM", NOW) is None
+
+
+def test_time_without_minutes():
+    assert parse_datetime_text("When: Wednesday Nov 4, 2026 1pm - 1:30pm (PST)", NOW) == dt(2026, 11, 4, 13)

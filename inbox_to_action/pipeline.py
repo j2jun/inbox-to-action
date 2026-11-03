@@ -82,8 +82,9 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
                 out.skipped = "invite update from a different sender"
                 return out
             if call.sequence >= existing.sequence:
-                fields = dict(title=call.title, due=call.due, status=call.status, join_link=call.join_link,
-                              phone=call.phone, sequence=call.sequence)
+                fields = dict(title=call.title, due=call.due, status=call.status, sequence=call.sequence)
+                if call.join_link or call.phone:  # an update without a link keeps the stored one
+                    fields.update(join_link=call.join_link, phone=call.phone)
                 if not existing.priority_locked:
                     fields["priority"], fields["reason"] = prioritize(
                         replace(existing, due=call.due), email, now, config.user_email, config.vips)

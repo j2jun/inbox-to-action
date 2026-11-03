@@ -40,17 +40,22 @@ def test_missing_fixture_returns_empty(load):
     assert extract_with_ai(load("02"), NOW, make_stub_call(FIXTURES)) == []
 
 
-def test_bad_response_returns_empty_and_logs(load, caplog):
+def test_bad_response_raises_and_logs(load, caplog):
+    import pytest
+    from inbox_to_action.ai import AIError
     e = load("11")
-    with caplog.at_level(logging.WARNING):
-        assert extract_with_ai(e, NOW, lambda req: {"content": [{"type": "text", "text": "hi"}]}) == []
+    with caplog.at_level(logging.WARNING), pytest.raises(AIError):
+        extract_with_ai(e, NOW, lambda req: {"content": [{"type": "text", "text": "hi"}]})
     assert e.message_id in caplog.text
 
 
 def test_body_never_logged(load, caplog):
     with caplog.at_level(logging.DEBUG):
         extract_with_ai(load("11"), NOW, make_stub_call(FIXTURES))
-        extract_with_ai(load("11"), NOW, lambda req: {})
+        try:
+            extract_with_ai(load("11"), NOW, lambda req: {})
+        except Exception:
+            pass
     assert "retention numbers" not in caplog.text
 
 

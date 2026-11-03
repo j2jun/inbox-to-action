@@ -9,6 +9,7 @@ from email.policy import default as default_policy
 from http.cookies import SimpleCookie
 
 from . import auth
+from .ai import AIError
 from .models import Task
 from .parse import email_from_payload
 from .pipeline import Config, process
@@ -151,7 +152,13 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
             email = email_from_payload(payload, ics or payload.get("ics"))
         except (ValueError, KeyError, TypeError, AttributeError):
             raise HTTPError(400, "bad payload") from None
-        out = process(email, store, now_fn(), config, ai_call)
+        try:
+            out = process(email, store, now_fn(), config, ai_call)
+        except AIError:
+            raise HTTPError(503, "AI unavailable, retry later") from None
+        except Exception:
+            log.exception("webhook %s failed", email.message_id)  # message id only, never the body
+            raise
         log.info("webhook %s: created=%d updated=%d skipped=%s",
                  email.message_id, len(out.created), len(out.updated), out.skipped)
         return 200, {"created": len(out.created), "updated": len(out.updated), "skipped": out.skipped}, []
@@ -184,7 +191,8 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
             status, body, headers = 500, {"error": "server error"}, []
         payload = json.dumps(body).encode() if body is not None else b""
         reasons = {200: "OK", 201: "Created", 204: "No Content", 400: "Bad Request", 401: "Unauthorized",
-                   404: "Not Found", 413: "Payload Too Large", 415: "Unsupported Media Type", 500: "Internal Server Error"}
+                   404: "Not Found", 413: "Payload Too Large", 415: "Unsupported Media Type", 500: "Internal Server Error",
+                   503: "Service Unavailable"}
         start_response(f"{status} {reasons.get(status, '')}", [
             ("Content-Type", "application/json"), ("Content-Length", str(len(payload))),
             ("Cache-Control", "no-store"), *headers])

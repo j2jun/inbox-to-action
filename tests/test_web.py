@@ -179,3 +179,11 @@ def test_changing_password_revokes_sessions(store):
     hdr, _ = login(a)
     b = make_app(store, cfg, STUB, now_fn=lambda: NOW, env={**ENV, "APP_PASSWORD": "a brand new passphrase"})
     assert call(b, "GET", "/api/tasks", headers=hdr)["status"] == 401
+
+
+def test_webhook_ai_failure_returns_503(store):
+    def boom(req):
+        raise OSError("down")
+    a = make_app(store, Config(USER, set(), TZ), boom, now_fn=lambda: NOW, env=ENV)
+    _, p = _payload("11")
+    assert call(a, "POST", "/webhook/email", p, headers={"X-Webhook-Secret": "hook-secret"})["status"] == 503

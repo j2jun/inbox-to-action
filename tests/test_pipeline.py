@@ -138,3 +138,55 @@ def test_update_fails_closed_when_original_sender_unknown(load):
     store.update(created.page_id, from_addr="")
     out = run(load("03"), store)
     assert out.skipped == "invite update from a different sender"
+
+
+def _no_ics(load, prefix):
+    e = load(prefix)
+    e.ics = None
+    return e
+
+
+def test_google_invite_without_ics_is_a_call_and_updates_in_place(load):
+    store = MemoryStore()
+    created = run(_no_ics(load, "02"), store).created
+    assert [t.platform for t in created] == ["Meet"]
+    out = run(_no_ics(load, "03"), store)
+    assert not out.created and len(out.updated) == 1
+    calls = [t for t in store.list_open() if t.type == "Call"]
+    assert len(calls) == 1 and calls[0].due == datetime(2026, 11, 5, 11, tzinfo=TZ)
+
+
+def test_cancel_subject_without_ics(load):
+    store = MemoryStore()
+    e = _no_ics(load, "02")
+    run(e, store)
+    cancel = _no_ics(load, "02")
+    cancel.message_id, cancel.subject = "<cancel@x>", "Canceled: " + e.subject
+    out = run(cancel, store)
+    assert out.updated and out.updated[0].status == "Cancelled"
+
+
+def test_update_without_link_keeps_stored_link(load):
+    store = MemoryStore()
+    run(load("02"), store)
+    upd = load("03")
+    upd.body = upd.body.replace("https://meet.google.com/xqv-hkdp-rme", "")
+    run(upd, store)
+    assert store.find("7k2v9q1northwind@google.com").join_link == "https://meet.google.com/xqv-hkdp-rme"
+
+
+def test_ai_failure_raises_so_zapier_retries(load):
+    from inbox_to_action.ai import AIError
+    def boom(req):
+        raise OSError("network down")
+    with pytest.raises(AIError):
+        run(load("11"), MemoryStore(), boom)
+
+
+def test_personal_zoom_room_is_not_a_shared_key(load):
+    store = MemoryStore()
+    a = load("01"); a.body = a.body.replace("https://acme.zoom.us/j/84512397720?pwd=cTFhR2xWb0RkT2x3", "https://acme.zoom.us/my/priya")
+    b = load("01"); b.body = a.body.replace("Nov 4, 2026 10:00 AM", "Nov 5, 2026 10:00 AM"); b.message_id = "<other@x>"
+    run(a, store, no_ai := (lambda req: {"content": [{"type": "tool_use", "input": {"tasks": []}}]}))
+    run(b, store, no_ai)
+    assert len([t for t in store.list_open() if t.type == "Call"]) == 2

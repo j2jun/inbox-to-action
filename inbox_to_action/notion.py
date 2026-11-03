@@ -4,6 +4,7 @@
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -49,13 +50,21 @@ def _plain(prop: dict) -> str:
     return "".join(r.get("plain_text", "") for r in prop.get(prop.get("type"), []) or [])
 
 
+def _format_sender(name: str, addr: str) -> str:
+    if not addr:
+        return name
+    if re.search(r'[,;:<>@()"\\]', name):  # quote so parseaddr reads "Okafor, Ben" back intact
+        name = '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return f"{name} <{addr}>" if name else addr
+
+
 def task_to_props(task: Task) -> dict:
     due = None
     if task.due is not None:
         due = {"start": task.due.isoformat() if isinstance(task.due, datetime) else task.due.isoformat()}
     # Phone calls keep their number as a tel: link so the page can dial it.
     link = task.join_link or (f"tel:{task.phone}" if task.phone else None)
-    sender = f"{task.from_name} <{task.from_addr}>" if task.from_addr else task.from_name
+    sender = _format_sender(task.from_name, task.from_addr)
     select = lambda v: {"select": {"name": v} if v else None}
     return {
         "Task": {"title": _text(task.title)},
@@ -164,7 +173,7 @@ class NotionStore:
                                                           "properties": task_to_props(task)}))
 
     def update(self, page_id: str, **fields) -> Task:
-        full = task_to_props(Task(title="", type="Action", **{k: v for k, v in fields.items()}))
+        full = task_to_props(Task(**{"title": "", "type": "Action", **fields}))
         props = {FIELD_PROPS[f]: full[FIELD_PROPS[f]] for f in fields if f in FIELD_PROPS}
         return page_to_task(self._req("PATCH", f"/pages/{page_id}", {"properties": props}))
 

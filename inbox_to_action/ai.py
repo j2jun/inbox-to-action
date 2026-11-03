@@ -11,6 +11,10 @@ from typing import Callable
 from .models import Email, Task
 
 log = logging.getLogger(__name__)
+
+
+class AIError(Exception):
+    """The model call failed; the webhook answers 503 so Zapier retries instead of dropping the email."""
 MODEL = "claude-haiku-5-5"
 MAX_TOKENS = 800
 MAX_CHARS = 4000
@@ -120,9 +124,9 @@ def extract_with_ai(email: Email, now: datetime, call_fn: Callable[[dict], dict]
         response = call_fn(build_request(email, now))
         block = next(b for b in response.get("content", []) if b.get("type") == "tool_use")
         items = block["input"]["tasks"]
-    except Exception as exc:  # network, bad JSON, missing tool_use: never crash the pipeline
+    except Exception as exc:  # network, bad JSON, missing tool_use
         log.warning("AI extraction failed for %s: %s", email.message_id, type(exc).__name__)
-        return []
+        raise AIError(type(exc).__name__) from None
     tasks = []
     for item in items:
         if not isinstance(item, dict) or not item.get("title"):
