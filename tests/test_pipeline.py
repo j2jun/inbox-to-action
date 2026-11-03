@@ -100,3 +100,33 @@ def test_snippet_limit_and_source_link(load):
 def test_no_task_found(load):
     out = run(make_email("thanks, sounds good"), MemoryStore())
     assert out.skipped == "no task found"
+
+
+def test_update_from_different_sender_is_rejected(load):
+    store = MemoryStore()
+    run(load("02"), store)
+    spoof = load("03")
+    spoof.from_addr = "attacker@evil.example"
+    spoof.body = spoof.body.replace("https://meet.google.com/xqv-hkdp-rme", "https://meet.google.com/evil-link")
+    out = run(spoof, store)
+    assert out.skipped == "invite update from a different sender" and not out.updated
+    t = store.find("7k2v9q1northwind@google.com")
+    assert t.join_link == "https://meet.google.com/xqv-hkdp-rme"
+
+
+def test_message_id_prefix_is_exact(load):
+    store = MemoryStore()
+    a = load("11")
+    run(a, store)
+    b = load("11")
+    b.message_id = "<board-deck-011@acme.example.other>"
+    same_answer = lambda req: STUB({**req, "_message_id": a.message_id})
+    assert len(run(b, store, same_answer).created) == 2
+
+
+def test_missing_message_id_gets_stable_synthetic_id():
+    from conftest import SAMPLES
+    from inbox_to_action.parse import parse_eml
+    raw = (SAMPLES / "11_direct_request.eml").read_bytes().replace(b"Message-ID: <board-deck-011@acme.example>\n", b"")
+    e1, e2 = parse_eml(raw), parse_eml(raw)
+    assert e1.message_id and e1.message_id == e2.message_id and e1.message_id.endswith("@inbox-to-action>")

@@ -1,6 +1,7 @@
 """Turn a raw .eml or a Zapier webhook payload into an Email."""
 import email
 import email.policy
+import hashlib
 import html
 import re
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
@@ -18,6 +19,11 @@ def _html_to_text(s: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", s))
 
 
+def _synthetic_id(raw: bytes) -> str:
+    # Stable stand-in when an email has no Message-ID, so dedupe never matches on an empty key.
+    return f"<{hashlib.sha256(raw).hexdigest()[:32]}@inbox-to-action>"
+
+
 def parse_eml(raw: bytes) -> Email:
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     text, htm, ics = None, None, None
@@ -33,7 +39,7 @@ def parse_eml(raw: bytes) -> Email:
             htm = part.get_content()
     name, addr = parseaddr(msg.get("From", ""))
     return Email(
-        message_id=(msg.get("Message-ID") or "").strip(),
+        message_id=(msg.get("Message-ID") or "").strip() or _synthetic_id(raw),
         subject=str(msg.get("Subject", "")),
         from_name=name,
         from_addr=addr.lower(),
@@ -58,7 +64,7 @@ def email_from_payload(payload: dict, ics: str | None) -> Email:
     if "<" in body and re.search(r"(?i)</(p|div|br|html|body)>", body):
         body = _html_to_text(body)
     return Email(
-        message_id=str(payload["message_id"]).strip(),
+        message_id=str(payload["message_id"]).strip(),  # web.py rejects an empty one with 400
         subject=str(payload.get("subject") or ""),
         from_name=name,
         from_addr=addr.lower(),

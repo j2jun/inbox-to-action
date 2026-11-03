@@ -49,13 +49,18 @@ def _create_all(tasks: list[Task], email, store, now, config, out: Outcome) -> N
         out.created.append(store.create(t))
 
 
+def _seen(email: Email, store) -> bool:
+    # Exact key or "<id>#n": a bare prefix would let "<a@x>" match "<a@x.other>#0".
+    return store.find(email.message_id) is not None or store.has_prefix(email.message_id + "#")
+
+
 def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outcome:
     out = Outcome()
 
     # Task-tool notifications first: they often carry List-Unsubscribe and must never be skipped.
     tool_tasks = detect_tool_task(email, now)
     if tool_tasks is not None:
-        if store.has_prefix(email.message_id):
+        if _seen(email, store):
             out.skipped = "already processed"
         else:
             _create_all(tool_tasks, email, store, now, config, out)
@@ -72,6 +77,10 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
     if call is not None:
         existing = store.find(call.key)
         if existing:
+            # Only the original sender may move, cancel or relink a meeting (blocks spoofed updates by UID).
+            if existing.from_addr and email.from_addr != existing.from_addr:
+                out.skipped = "invite update from a different sender"
+                return out
             if call.sequence >= existing.sequence:
                 fields = dict(title=call.title, due=call.due, status=call.status, join_link=call.join_link,
                               phone=call.phone, sequence=call.sequence)
@@ -90,7 +99,7 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
                     email, store, now, config, out)
         return out
 
-    if store.has_prefix(email.message_id):
+    if _seen(email, store):
         out.skipped = "already processed"
         return out
     tasks = extract_with_ai(email, now, ai_call)
