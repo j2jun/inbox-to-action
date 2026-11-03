@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today · Inbox to Action</title>
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/today.css">
+</head>
+<body>
+<main class="app" id="app">
+  <div class="top">
+    <h1 class="date"><span id="dateLabel">Today</span><small id="summary">Loading…</small></h1>
+    <div class="sync" id="sync" role="status" aria-live="polite"><i aria-hidden="true"></i><span>Connecting…</span></div>
+  </div>
+
+  <section id="loginView" hidden aria-labelledby="loginTitle">
+    <h2 id="loginTitle" class="login-title">Sign in</h2>
+    <form id="loginForm" class="add" autocomplete="on">
+      <label for="password" class="visually-hidden">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
+      <button type="submit" class="btn join">Sign in</button>
+    </form>
+    <p class="hint" id="loginError" role="alert"></p>
+  </section>
+
+  <div id="mainView" hidden>
+    <form class="add" id="addForm" autocomplete="off">
+      <span aria-hidden="true" class="plus">+</span>
+      <input id="addInput" aria-label="Add a task" aria-describedby="addHint" placeholder="Add a task… e.g. Call Priya Fri 3pm p1" maxlength="500">
+    </form>
+    <p class="hint" id="addHint">Understands today, tomorrow, mon–fri, a time like 3pm, and p1–p4. Enter to add.</p>
+    <div class="flow" id="flow"></div>
+    <p class="empty" id="empty" hidden>Nothing waiting on you. Enjoy the strategy time.</p>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toastMsg"></span><button type="button" id="toastAction">Undo</button>
+  </div>
+</main>
+<script src="/today.js"></script>
+</body>
+</html>
