@@ -41,3 +41,18 @@ def test_all_samples_parse():
         e = parse_eml(f.read_bytes())
         assert e.message_id, f
         assert e.date.tzinfo is not None, f
+
+
+import pytest
+
+
+@pytest.mark.parametrize("value", ["Mon, 02 Nov 2026 08:45:00 -0800", "2026-11-02T16:45:00Z",
+                                   "2026-11-02T08:45:00-08:00", "1793637900"])
+def test_payload_date_formats(value):
+    p = {"message_id": "<a@b>", "from": "x <x@y.z>", "subject": "s", "date": value, "body": "hi"}
+    assert email_from_payload(p, None).date.isoformat().startswith("2026-11-02T")
+
+
+def test_payload_missing_or_bad_date_uses_now():
+    p = {"message_id": "<a@b>", "from": "x <x@y.z>", "subject": "s", "date": "sometime", "body": "hi"}
+    assert email_from_payload(p, None).date.tzinfo is not None

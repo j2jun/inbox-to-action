@@ -39,7 +39,11 @@ class Outcome:
 def _finish(task: Task, email: Email, now: datetime, config: Config) -> Task:
     level, reason = prioritize(task, email, now, config.user_email, config.vips)
     snippet = re.sub(r"\s+", " ", _trim(email.body))[:200]
-    link = "https://mail.google.com/mail/u/0/#search/rfc822msgid%3A" + quote(email.message_id.strip("<>"), safe="")
+    raw_id = email.message_id.strip("<>")
+    if "@" in raw_id:  # a real RFC 822 Message-ID
+        link = "https://mail.google.com/mail/u/0/#search/rfc822msgid%3A" + quote(raw_id, safe="")
+    else:  # Zapier's Gmail trigger sends Gmail's own message id
+        link = "https://mail.google.com/mail/u/0/#all/" + quote(email.thread_id or raw_id, safe="")
     return replace(task, priority=level, reason=reason, snippet=snippet, source_email=link)
 
 

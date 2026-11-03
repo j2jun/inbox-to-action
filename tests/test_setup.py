@@ -33,3 +33,16 @@ def test_password_rules_reask():
               set_env=lambda n, v: saved.__setitem__(n, v), say=out.append)
     assert saved["APP_PASSWORD"] == "long enough pass" and "VIP_EMAILS" not in saved
     assert out.count("Use at least 12 characters.") == 1 and out.count("Those didn't match, try again.") == 1
+
+
+def test_notion_error_is_explained_not_a_traceback():
+    from inbox_to_action.notion import NotionError
+    answers = iter([PAGE, ""])
+    secrets = iter(["bad", "k", "long enough pass", "long enough pass"])
+    out, saved = [], {}
+    def refuse(token, page):
+        raise NotionError("Notion 401: unauthorized")
+    with pytest.raises(SystemExit):
+        run_setup(ask=lambda q: next(answers), ask_secret=lambda q: next(secrets), create_db=refuse,
+                  set_env=lambda n, v: saved.__setitem__(n, v), say=out.append)
+    assert saved == {} and any("Notion refused" in line and "401" in line for line in out)

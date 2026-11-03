@@ -4,6 +4,7 @@ import email.policy
 import hashlib
 import html
 import re
+from datetime import datetime, timezone
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 
 from .models import Email
@@ -60,6 +61,22 @@ def parse_eml(raw: bytes) -> Email:
     )
 
 
+def _payload_date(value) -> datetime:
+    """Zapier may send RFC 2822, ISO 8601 or a Unix timestamp; never reject an email over its date."""
+    text = str(value or "").strip()
+    try:
+        return parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        pass
+    try:
+        if text.isdigit():
+            return datetime.fromtimestamp(int(text[:10]), timezone.utc)
+        d = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return datetime.now(timezone.utc)
+
+
 def email_from_payload(payload: dict, ics: str | None) -> Email:
     """Build an Email from the JSON the Zapier webhook sends (see plan Task 9)."""
     name, addr = parseaddr(payload.get("from") or "")
@@ -77,7 +94,7 @@ def email_from_payload(payload: dict, ics: str | None) -> Email:
         from_addr=addr.lower(),
         to=_addrs(payload.get("to")),
         cc=_addrs(payload.get("cc")),
-        date=parsedate_to_datetime(payload["date"]),
+        date=_payload_date(payload.get("date")),
         headers=headers,
         body=body,
         ics=ics,

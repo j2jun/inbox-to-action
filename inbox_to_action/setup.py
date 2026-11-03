@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-from .notion import setup_database
+from .notion import NotionError, setup_database
 
 
 def page_id_from(text: str) -> str:
@@ -29,7 +29,15 @@ def run_setup(ask, ask_secret, create_db, set_env, say=print) -> None:
             break
         except ValueError:
             say("That doesn't look like a Notion page link. Copy it from Share → Copy link.")
-    db = create_db(token, page)
+    try:
+        db = create_db(token, page)
+    except NotionError as exc:
+        say(f"Notion refused ({exc}). Check the token, and that the page is connected to the integration")
+        say("(open the page → ••• → Connections → your integration), then run setup again.")
+        sys.exit(1)
+    except OSError as exc:
+        say(f"Couldn't reach Notion ({type(exc).__name__}). Check your internet connection and run setup again.")
+        sys.exit(1)
     say("          Notion database created.")
     say("Step 2/4  Anthropic: create a key at https://console.anthropic.com/settings/keys")
     key = ask_secret("Anthropic API key: ").strip()
@@ -64,5 +72,15 @@ def vercel_set(name: str, value: str) -> None:
             sys.exit(f"Vercel refused {name} ({target}). Run `npx vercel login` and try again.")
 
 
+def preflight() -> None:
+    """Fail before asking for any secret if Vercel isn't ready."""
+    from pathlib import Path
+    if not Path(".vercel/project.json").exists():
+        sys.exit("Run this from the inbox-to-action folder (cd ~/inbox-to-action), then try again.")
+    if subprocess.run(["npx", "vercel", "whoami"], capture_output=True).returncode != 0:
+        sys.exit("You're not signed in to Vercel. Run `npx vercel login`, then try again.")
+
+
 if __name__ == "__main__":
+    preflight()
     run_setup(ask=input, ask_secret=getpass.getpass, create_db=setup_database, set_env=vercel_set)

@@ -230,3 +230,16 @@ def test_huge_ids_are_shortened_stably(load):
     e.ics = e.ics.replace("UID:7k2v9q1northwind@google.com", "UID:" + "u" * 5000)
     k1, k2 = detect_call(e, NOW).key, detect_call(e, NOW).key
     assert k1 == k2 and len(k1) < 500
+
+
+def test_source_link_for_gmail_api_id():
+    e = make_email("Can you send the deck by Friday?", message_id="<18b9f3c2a1d4e5f6>")
+    e.thread_id = "18b9f3c2a1d4e5f6"
+    out = run(e, MemoryStore(), lambda req: {"content": [{"type": "tool_use", "input": {"tasks": [
+        {"title": "Send deck", "type": "Action", "due": None, "platform": None, "phone": None}]}}]})
+    assert out.created[0].source_email == "https://mail.google.com/mail/u/0/#all/18b9f3c2a1d4e5f6"
+
+
+def test_source_link_for_rfc_message_id(load):
+    t = run(load("12"), MemoryStore(), no_ai).created[0]
+    assert t.source_email.startswith("https://mail.google.com/mail/u/0/#search/rfc822msgid%3A")
