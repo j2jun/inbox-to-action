@@ -3,6 +3,7 @@ import hashlib
 import hmac
 
 TTL = 30 * 86400
+MIN_PASSWORD = 12  # ponytail: no login rate limit (serverless instances share no memory); length makes guessing impractical
 
 
 def _sign(secret: str, msg: str) -> str:
@@ -28,4 +29,9 @@ def check_session(cookie: str | None, secret: str, now_ts: float) -> bool:
 
 def check_password(given: str, expected: str) -> bool:
     # Fails closed when no password is configured.
-    return bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
+    return len(expected) >= MIN_PASSWORD and hmac.compare_digest(given.encode(), expected.encode())
+
+
+def session_key(session_secret: str, password: str) -> str:
+    """Sessions are signed with the password mixed in, so changing APP_PASSWORD signs out every device."""
+    return session_secret + ":" + hashlib.sha256(password.encode()).hexdigest() if session_secret else ""

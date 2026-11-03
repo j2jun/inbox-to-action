@@ -1,6 +1,6 @@
 """Local dev server: the Today page + API on http://localhost:8000 with sample data, no Notion needed.
 
-    python3 -m inbox_to_action.dev            # password: dev (or $APP_PASSWORD)
+    python3 -m inbox_to_action.dev            # password: inbox-to-action-dev (or $APP_PASSWORD)
 """
 import mimetypes
 import os
@@ -28,7 +28,7 @@ def build():
     sample_now = datetime(2026, 11, 2, 9, 30, tzinfo=tz)
     for f in sorted((ROOT / "samples").glob("*.eml")):
         process(parse_eml(f.read_bytes()), store, sample_now, config, stub)
-    env = {"APP_PASSWORD": os.environ.get("APP_PASSWORD", "dev"), "SESSION_SECRET": secrets.token_hex(16),
+    env = {"APP_PASSWORD": os.environ.get("APP_PASSWORD", "inbox-to-action-dev"), "SESSION_SECRET": secrets.token_hex(16),
            "WEBHOOK_SECRET": "dev", "DEV_INSECURE_COOKIE": "1"}
     api = make_app(store, config, stub, now_fn=lambda: sample_now, env=env)
 
@@ -48,5 +48,5 @@ def build():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    print(f"Today page: http://localhost:{port}  (password: {os.environ.get('APP_PASSWORD', 'dev')})")
+    print(f"Today page: http://localhost:{port}  (password: {os.environ.get('APP_PASSWORD', 'inbox-to-action-dev')})")
     make_server("127.0.0.1", port, build()).serve_forever()

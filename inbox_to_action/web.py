@@ -52,6 +52,7 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
     now_fn = now_fn or (lambda: datetime.now(config.tz))
     # Secure cookies everywhere except the local dev server over plain http (dev.py sets DEV_INSECURE_COOKIE=1).
     secure = "" if env.get("DEV_INSECURE_COOKIE") == "1" else " Secure;"
+    signing_key = auth.session_key(env.get("SESSION_SECRET", ""), env.get("APP_PASSWORD", ""))
 
     def body_bytes(environ) -> bytes:
         try:
@@ -76,13 +77,13 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
     def logged_in(environ) -> bool:
         cookie = SimpleCookie(environ.get("HTTP_COOKIE", ""))
         value = cookie["session"].value if "session" in cookie else None
-        return auth.check_session(value, env.get("SESSION_SECRET", ""), now_fn().timestamp())
+        return auth.check_session(value, signing_key, now_fn().timestamp())
 
     def login(environ):
         data = json_body(environ)
         if not auth.check_password(str(data.get("password", "")), env.get("APP_PASSWORD", "")):
             raise HTTPError(401, "wrong password")
-        token = auth.make_session(env["SESSION_SECRET"], now_fn().timestamp())
+        token = auth.make_session(signing_key, now_fn().timestamp())
         return 204, None, [("Set-Cookie", f"session={token}; HttpOnly;{secure} SameSite=Lax; Path=/; Max-Age={auth.TTL}")]
 
     def logout(environ):

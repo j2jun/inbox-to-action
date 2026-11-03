@@ -66,7 +66,8 @@ def test_login_and_session(app):
 
 def test_expired_session(app, store):
     from inbox_to_action.auth import make_session
-    old = make_session(ENV["SESSION_SECRET"], NOW.timestamp() - 31 * 86400)
+    from inbox_to_action.auth import session_key
+    old = make_session(session_key(ENV["SESSION_SECRET"], ENV["APP_PASSWORD"]), NOW.timestamp() - 31 * 86400)
     assert call(app, "GET", "/api/tasks", headers={"Cookie": f"session={old}"})["status"] == 401
 
 
@@ -165,3 +166,16 @@ def test_webhook_multipart_ics(app, store):
 def test_webhook_body_too_large(app):
     r = call(app, "POST", "/webhook/email", raw=b"x" * 2_000_001, headers={"X-Webhook-Secret": "hook-secret"})
     assert r["status"] == 413
+
+
+def test_short_password_config_fails_closed(store):
+    a = make_app(store, Config(USER, set(), TZ), STUB, now_fn=lambda: NOW, env={**ENV, "APP_PASSWORD": "short"})
+    assert call(a, "POST", "/login", {"password": "short"})["status"] == 401
+
+
+def test_changing_password_revokes_sessions(store):
+    cfg = Config(USER, set(), TZ)
+    a = make_app(store, cfg, STUB, now_fn=lambda: NOW, env=ENV)
+    hdr, _ = login(a)
+    b = make_app(store, cfg, STUB, now_fn=lambda: NOW, env={**ENV, "APP_PASSWORD": "a brand new passphrase"})
+    assert call(b, "GET", "/api/tasks", headers=hdr)["status"] == 401
