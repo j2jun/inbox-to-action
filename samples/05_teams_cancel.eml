@@ -1,0 +1,32 @@
+From: Ben Okafor <ben@acme.example>
+To: Alex Kim <alex@acme.example>
+Subject: Canceled: Hiring debrief - Senior PM candidate
+Date: Mon, 02 Nov 2026 11:15:00 -0800
+Message-ID: <hiring-debrief-cancel-005@acme.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+Candidate withdrew this morning, so cancelling the debrief. No scorecard needed.
+
+--b1
+Content-Type: text/calendar; charset=utf-8; method=CANCEL
+Content-Disposition: attachment; filename="meeting.ics"
+
+BEGIN:VCALENDAR
+PRODID:Microsoft Exchange Server 2010
+VERSION:2.0
+METHOD:CANCEL
+BEGIN:VEVENT
+DTSTART:20261102T230000Z
+DTEND:20261102T233000Z
+UID:040000008200E00074C5B7101A82E00800000000D1A2B3C4
+SEQUENCE:1
+SUMMARY:Canceled: Hiring debrief - Senior PM candidate
+STATUS:CANCELLED
+END:VEVENT
+END:VCALENDAR
+
+--b1--

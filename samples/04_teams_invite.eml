@@ -1,0 +1,43 @@
+From: Ben Okafor <ben@acme.example>
+To: Alex Kim <alex@acme.example>
+Subject: Hiring debrief - Senior PM candidate
+Date: Mon, 02 Nov 2026 08:30:00 -0800
+Message-ID: <hiring-debrief-004@acme.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+Quick debrief on today's Senior PM loop.
+
+________________________________________________________________________________
+Microsoft Teams meeting
+Join on your computer, mobile app or room device
+Click here to join the meeting
+https://teams.microsoft.com/l/meetup-join/19%3ameeting_NzE2YjQ0ZDQtYTFkNi00%40thread.v2/0?context=%7b%22Tid%22%3a%22acme%22%7d
+Meeting ID: 291 448 615 233
+Passcode: Hk7pQ2
+________________________________________________________________________________
+
+--b1
+Content-Type: text/calendar; charset=utf-8; method=REQUEST
+Content-Disposition: attachment; filename="meeting.ics"
+
+BEGIN:VCALENDAR
+PRODID:Microsoft Exchange Server 2010
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTART:20261102T230000Z
+DTEND:20261102T233000Z
+UID:040000008200E00074C5B7101A82E00800000000D1A2B3C4
+SEQUENCE:0
+ORGANIZER;CN=Ben Okafor:mailto:ben@acme.example
+SUMMARY:Hiring debrief - Senior PM candidate
+LOCATION:Microsoft Teams Meeting
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+
+--b1--

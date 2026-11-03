@@ -1,0 +1,45 @@
+From: Google Calendar <calendar-notification@google.com>
+Sender: Marcus Webb <marcus@northwind.example>
+To: alex@acme.example
+Subject: Invitation: Vendor sync - Northwind @ Wed Nov 4, 2026 1pm - 1:30pm (PST) (alex@acme.example)
+Date: Mon, 02 Nov 2026 07:40:00 -0800
+Message-ID: <vendor-sync-invite-002@google.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+You have been invited to the following event.
+
+Vendor sync - Northwind
+When: Wednesday Nov 4, 2026 1pm - 1:30pm (PST)
+Organizer: Marcus Webb <marcus@northwind.example>
+
+Join with Google Meet: https://meet.google.com/xqv-hkdp-rme
+Join by phone: +1 470-555-0198 PIN: 482 113 907#
+
+Agenda: renewal terms, SLA credits.
+
+--b1
+Content-Type: text/calendar; charset=utf-8; method=REQUEST
+Content-Disposition: attachment; filename="invite.ics"
+
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTART:20261104T210000Z
+DTEND:20261104T213000Z
+UID:7k2v9q1northwind@google.com
+SEQUENCE:0
+ORGANIZER;CN=Marcus Webb:mailto:marcus@northwind.example
+ATTENDEE;CN=alex@acme.example;PARTSTAT=NEEDS-ACTION:mailto:alex@acme.example
+SUMMARY:Vendor sync - Northwind
+LOCATION:https://meet.google.com/xqv-hkdp-rme
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+
+--b1--

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox to Action: one-surface styles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:#111; font:14px/1.45 system-ui,-apple-system,sans-serif; }
+
+  /* ---------- picker (outside the design system) ---------- */
+  .variant-page { container: variant-page / inline-size; padding:24px; }
+  .variant-layout { display:flex; flex-direction:column; gap:16px; max-width:760px; margin-inline:auto; }
+  .variant-picker { all:unset; display:none; flex-direction:column; gap:16px; padding:6px; border-radius:14px; background:rgb(20 20 20 / .92); box-shadow:inset 0 0 0 1px rgb(255 255 255 / .1); font:13px/1 system-ui,-apple-system,sans-serif; user-select:none; }
+  .variant-picker-group { display:flex; flex-direction:column; gap:2px; }
+  .variant-picker-heading { display:flex; align-items:center; gap:6px; padding:4px 10px 6px; font-size:11px; font-weight:500; color:rgb(255 255 255 / .45); }
+  .variant-picker button { all:unset; padding:8px 10px; border-radius:8px; color:rgb(255 255 255 / .6); cursor:pointer; white-space:nowrap; }
+  .variant-picker button:hover { color:rgb(255 255 255 / .85); }
+  .variant-picker button[aria-pressed="true"] { background:rgb(255 255 255 / .14); color:#fff; font-weight:500; }
+  .variant-picker button:focus-visible { outline:2px solid rgb(255 255 255 / .7); outline-offset:2px; }
+  .variant-picker-select { position:relative; align-self:flex-start; color:#fff; }
+  .variant-picker-select select { all:unset; padding:10px 36px 10px 16px; border-radius:999px; background:rgb(20 20 20 / .92); box-shadow:inset 0 0 0 1px rgb(255 255 255 / .15); font:500 13px/1 system-ui,sans-serif; cursor:pointer; }
+  .variant-picker-select svg { position:absolute; top:50%; right:14px; translate:0 -50%; pointer-events:none; color:rgb(255 255 255 / .6); }
+  .variant-note { font:12px/1.4 system-ui,sans-serif; color:rgb(255 255 255 / .5); padding:2px 10px 8px; }
+  @container variant-page (min-width: 992px) {
+    .variant-layout { display:grid; grid-template-columns:208px 760px; justify-content:center; gap:24px; align-items:start; max-width:none; }
+    .variant-picker { display:flex; position:sticky; top:24px; }
+    .variant-picker-select { display:none; }
+  }
+  .picker-hidden .variant-picker, .picker-hidden .variant-picker-select { display:none !important; }
+
+  /* ---------- the app: shared structure ---------- */
+  .app { --r:14px; background:var(--bg); color:var(--text); border-radius:20px; padding:36px 36px 48px; font-family:var(--body); min-width:0; position:relative; }
+  .app :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+  .date { font-family:var(--display); font-size:var(--date-size); line-height:1; letter-spacing:var(--date-track); margin:0; font-weight:var(--date-weight); }
+  .date small { display:block; font-family:var(--body); font-size:14px; letter-spacing:0; color:var(--muted); margin-top:10px; font-weight:400; }
+  .sync { display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--muted); font-family:var(--meta); padding-top:6px; }
+  .sync i { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px color-mix(in oklch, var(--ok) 25%, transparent); }
+  .sync.busy i { background:var(--accent); }
+
+  .add { margin:28px 0 8px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--line); padding:4px 0 12px; }
+  .add label { color:var(--muted); font-size:20px; line-height:1; }
+  .add input { flex:1; min-width:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:15px; padding:6px 0; }
+  .add input::placeholder { color:var(--muted); }
+  .add input:focus { outline:none; }
+  .add:focus-within { border-color:var(--accent); }
+  .hint { font-size:12px; color:var(--muted); font-family:var(--meta); margin:0 0 20px; }
+
+  .flow { position:relative; }
+  .flow::before { content:""; position:absolute; inset-block:8px; inset-inline-start:var(--rail-x); width:var(--rail-w); background:var(--rail); border-radius:2px; }
+  .sec { position:relative; padding-top:22px; }
+  .sec h2 { margin:0 0 6px; padding-inline-start:var(--content-x); font-family:var(--meta); font-size:var(--sec-size); text-transform:var(--sec-case); letter-spacing:var(--sec-track); color:var(--sec-color); font-weight:var(--sec-weight); display:flex; gap:10px; align-items:baseline; }
+  .sec h2 span { color:var(--muted); font-weight:400; }
+  .item { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; padding:10px 0 10px var(--content-x); border-radius:10px; transition:background-color 150ms ease-out; }
+  .item:hover, .item:focus-within { background:var(--hover); }
+  .node { position:absolute; inset-inline-start:calc(var(--rail-x) + var(--rail-w)/2 - 6px); top:15px; width:12px; height:12px; border-radius:50%; background:var(--bg); border:2px solid var(--pc); }
+  .item.call .node { border-radius:3px; transform:rotate(45deg); }
+  .line { display:flex; gap:10px; align-items:baseline; min-width:0; }
+  .line input[type=checkbox] { flex:none; width:16px; height:16px; margin:0; translate:0 2px; accent-color:var(--accent); }
+  .t { font-weight:var(--t-weight); font-size:var(--t-size); min-width:0; overflow-wrap:anywhere; cursor:pointer; }
+  .item.done .t { text-decoration:line-through; color:var(--muted); }
+  .item.done .node { background:var(--pc); }
+  .meta { grid-column:1; display:flex; flex-wrap:wrap; gap:4px 10px; padding-inline-start:26px; font-size:12.5px; color:var(--muted); font-family:var(--meta); }
+  .meta .vip { color:var(--text); }
+  .when { font-variant-numeric:tabular-nums; }
+  .acts { grid-column:2; grid-row:1 / span 2; display:flex; gap:6px; align-items:center; align-self:center; }
+  .btn { border:0; background:transparent; color:var(--muted); font:500 12.5px/1 var(--meta); padding:7px 9px; border-radius:8px; cursor:pointer; text-decoration:none; white-space:nowrap; }
+  .btn:hover { background:var(--hover-strong); color:var(--text); }
+  .join { color:var(--accent); background:var(--accent-soft); }
+  .prio { color:var(--pc); background:color-mix(in oklch, var(--pc) 14%, transparent); font-weight:600; min-width:34px; }
+  .snooze { opacity:0; }
+  .item:hover .snooze, .item:focus-within .snooze { opacity:1; }
+  @media (hover:none) { .snooze { opacity:1; } }
+  .p1 { --pc:var(--c1); } .p2 { --pc:var(--c2); } .p3 { --pc:var(--c3); } .p4 { --pc:var(--c4); }
+
+  .menu { position:absolute; z-index:5; background:var(--menu-bg); color:var(--text); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgb(0 0 0 / .25), 0 0 0 1px var(--line); min-width:170px; }
+  .menu button { display:flex; width:100%; gap:8px; align-items:center; border:0; background:transparent; color:inherit; font:13px/1.2 var(--body); padding:8px 10px; border-radius:8px; cursor:pointer; text-align:start; }
+  .menu button:hover, .menu button:focus-visible { background:var(--hover-strong); outline:none; }
+  .menu .dot { width:8px; height:8px; border-radius:50%; background:var(--pc); }
+  .menu small { margin-inline-start:auto; color:var(--muted); font-family:var(--meta); }
+
+  .toast { position:fixed; left:50%; bottom:24px; translate:-50% 0; background:var(--toast-bg); color:var(--toast-text); padding:10px 10px 10px 16px; border-radius:12px; display:flex; gap:12px; align-items:center; font:13px/1 var(--body); box-shadow:0 10px 30px rgb(0 0 0 / .3); }
+  .toast button { border:0; background:rgb(255 255 255 / .15); color:inherit; font:600 13px/1 var(--body); padding:8px 10px; border-radius:8px; cursor:pointer; }
+  .toast[hidden] { display:none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .item { animation:none; }
+    .item.moved { animation:arrive 600ms ease-out; }
+    @keyframes arrive { from { background:var(--accent-soft); } to { background:transparent; } }
+  }
+  @container variant-page (max-width: 560px) {
+    .app { padding:24px 18px 36px; }
+    .acts { grid-column:1; grid-row:auto; padding-inline-start:26px; }
+  }
+
+  /* ---------- style 1: Quiet ---------- */
+  .s-quiet { --bg:#fbfaf7; --text:#1d1c1a; --muted:#6f6c66; --line:#e6e3dc; --hover:#f3f1ec; --hover-strong:#ebe8e1; --menu-bg:#fff;
+    --accent:#2e5bd8; --accent-soft:#e8eefc; --ok:#2f9e5b; --rail:#e6e3dc; --rail-x:6px; --rail-w:2px; --content-x:28px;
+    --c1:#c2412d; --c2:#b07206; --c3:#3f7d52; --c4:#8a877f;
+    --display:"Inter",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; --meta:"Inter",system-ui,sans-serif;
+    --date-size:34px; --date-track:-.02em; --date-weight:600; --sec-size:12px; --sec-case:uppercase; --sec-track:.06em; --sec-color:#6f6c66; --sec-weight:600;
+    --t-weight:500; --t-size:15px; --toast-bg:#1d1c1a; --toast-text:#fff; }
+  @media (prefers-color-scheme: dark) {
+    .s-quiet { --bg:#1b1a18; --text:#ecebe7; --muted:#a19e97; --line:#33312d; --hover:#24231f; --hover-strong:#2d2b27; --menu-bg:#262521;
+      --accent:#86a8ff; --accent-soft:#25304d; --rail:#33312d; --c1:#ff8a75; --c2:#f0b44c; --c3:#7fca95; --c4:#a19e97; --sec-color:#a19e97; --toast-bg:#ecebe7; --toast-text:#1b1a18; }
+    .s-quiet .toast button { background:rgb(0 0 0 / .1); }
+  }
+
+  /* ---------- style 2: Editorial ---------- */
+  .s-editorial { --bg:#f4efe6; --text:#22201b; --muted:#6e675b; --line:#d9d0c0; --hover:#ece5d8; --hover-strong:#e3dac9; --menu-bg:#fbf8f2;
+    --accent:#1f4e8c; --accent-soft:#dde5f1; --ok:#4f7a3a; --rail:#22201b; --rail-x:6px; --rail-w:1px; --content-x:30px;
+    --c1:#a2381f; --c2:#9a6a12; --c3:#4f7a3a; --c4:#8b8475;
+    --display:"Fraunces",Georgia,serif; --body:"Inter",system-ui,sans-serif; --meta:"Inter",system-ui,sans-serif;
+    --date-size:56px; --date-track:-.03em; --date-weight:400; --sec-size:22px; --sec-case:none; --sec-track:-.01em; --sec-color:#22201b; --sec-weight:400;
+    --t-weight:500; --t-size:15.5px; --toast-bg:#22201b; --toast-text:#f4efe6; }
+  .s-editorial .sec h2 { font-family:"Fraunces",Georgia,serif; font-style:italic; }
+  .s-editorial .sec { padding-top:30px; }
+  @media (prefers-color-scheme: dark) {
+    .s-editorial { --bg:#1e1c18; --text:#efe8da; --muted:#a89f8e; --line:#3b372f; --hover:#27241f; --hover-strong:#312d26; --menu-bg:#2a2721;
+      --accent:#8fb4ea; --accent-soft:#22324a; --rail:#efe8da; --c1:#f08a6c; --c2:#e3b35c; --c3:#9cc77f; --c4:#a89f8e; --sec-color:#efe8da; --toast-bg:#efe8da; --toast-text:#1e1c18; }
+    .s-editorial .toast button { background:rgb(0 0 0 / .1); }
+  }
+
+  /* ---------- style 3: Aurora (modern dark) ---------- */
+  .s-aurora { --bg:#09090d; --text:#ededf3; --muted:#8c8ca1; --line:rgb(255 255 255 / .08); --hover:rgb(255 255 255 / .035); --hover-strong:rgb(255 255 255 / .08); --menu-bg:rgb(24 24 32 / .72);
+    --accent:#a78bfa; --accent-soft:rgb(167 139 250 / .14); --ok:#34d399; --rail:linear-gradient(rgb(167 139 250 / .7), rgb(34 211 238 / .35) 55%, rgb(255 255 255 / .06)); --rail-x:8px; --rail-w:1px; --content-x:32px;
+    --c1:#fb7185; --c2:#fbbf24; --c3:#34d399; --c4:#71717a;
+    --display:"Geist","Inter",system-ui,sans-serif; --body:"Geist","Inter",system-ui,sans-serif; --meta:"Geist","Inter",system-ui,sans-serif;
+    --date-size:40px; --date-track:-.035em; --date-weight:600; --sec-size:12px; --sec-case:none; --sec-track:0; --sec-color:#c4c4d4; --sec-weight:500;
+    --t-weight:500; --t-size:15px; --toast-bg:rgb(24 24 32 / .8); --toast-text:#ededf3;
+    background:
+      radial-gradient(60% 40% at 15% 0%, rgb(124 92 255 / .22), transparent 70%),
+      radial-gradient(50% 35% at 95% 5%, rgb(34 211 238 / .14), transparent 70%),
+      #09090d;
+    box-shadow:inset 0 0 0 1px rgb(255 255 255 / .06); }
+  .s-aurora .date { background:linear-gradient(180deg, #fff 30%, #a9a9c2); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .s-aurora .date small { -webkit-text-fill-color:var(--muted); }
+  .s-aurora .when, .s-aurora .hint, .s-aurora .sync span { font-family:"Geist Mono",ui-monospace,monospace; font-size:12px; }
+  .s-aurora .sync { padding:6px 12px; border-radius:999px; background:rgb(255 255 255 / .04); box-shadow:inset 0 0 0 1px var(--line); }
+  .s-aurora .add { border:0; border-radius:14px; padding:6px 14px; background:rgb(255 255 255 / .04); box-shadow:inset 0 0 0 1px var(--line); transition:box-shadow 150ms ease-out; }
+  .s-aurora .add:focus-within { box-shadow:inset 0 0 0 1px rgb(167 139 250 / .6), 0 0 0 4px rgb(167 139 250 / .15); }
+  .s-aurora .hint { margin-top:10px; }
+  .s-aurora .sec h2 span { font-family:"Geist Mono",ui-monospace,monospace; font-size:11px; padding:2px 7px; border-radius:999px; background:rgb(255 255 255 / .06); }
+  .s-aurora .item { border-radius:12px; }
+  .s-aurora .item:hover, .s-aurora .item:focus-within { box-shadow:inset 0 0 0 1px var(--line); }
+  .s-aurora .node { width:10px; height:10px; inset-inline-start:calc(var(--rail-x) - 4.5px); top:16px; border-width:1.5px; background:#09090d; box-shadow:0 0 12px color-mix(in oklch, var(--pc) 55%, transparent); }
+  .s-aurora .btn { border-radius:999px; padding:7px 12px; }
+  .s-aurora .join { color:#fff; background:linear-gradient(135deg, #8b5cf6, #6366f1); box-shadow:0 4px 14px rgb(124 92 255 / .35); }
+  .s-aurora .join:hover { color:#fff; background:linear-gradient(135deg, #9d74ff, #7477ff); }
+  .s-aurora .prio { background:color-mix(in oklch, var(--pc) 12%, transparent); box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--pc) 30%, transparent); }
+  .s-aurora .menu, .s-aurora .toast { -webkit-backdrop-filter:blur(16px) saturate(140%); backdrop-filter:blur(16px) saturate(140%); box-shadow:0 20px 50px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .1); }
+  .s-aurora .toast button { background:rgb(167 139 250 / .2); color:#d9ccff; }
+  .s-aurora input[type=checkbox] { accent-color:#8b5cf6; }
+  @media (prefers-reduced-motion: no-preference) {
+    .s-aurora .sync i { animation:pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { box-shadow:0 0 0 6px rgb(52 211 153 / 0); } }
+  }
+</style>
+</head>
+<body>
+<div class="variant-page">
+  <div class="variant-layout">
+    <nav class="variant-picker" aria-label="Variants">
+      <div class="variant-picker-group" role="group" aria-labelledby="vg-emph">
+        <span class="variant-picker-heading" id="vg-emph"><svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v4a3 3 0 0 0 3 3h7"/><path d="m10 7 3 3-3 3"/></svg>Emphasis</span>
+        <button type="button" data-variant="quiet">Quiet</button>
+        <button type="button" data-variant="editorial">Editorial</button>
+        <button type="button" data-variant="aurora">Aurora</button>
+      </div>
+      <p class="variant-note">← → flip · H hide<br>Try: tick a task, click a P-label, hover → Snooze, type in the add box</p>
+    </nav>
+    <div class="variant-picker-select">
+      <select aria-label="Variant"><optgroup label="Emphasis"><option value="quiet">Quiet</option><option value="editorial">Editorial</option><option value="aurora">Aurora</option></optgroup></select>
+      <svg aria-hidden="true" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>
+    </div>
+
+    <main class="app s-quiet" id="app">
+      <div class="top">
+        <h1 class="date">Monday, Nov 2<small id="summary"></small></h1>
+        <div class="sync" id="sync" role="status"><i></i><span>Synced with Notion · just now</span></div>
+      </div>
+      <form class="add" id="addForm" autocomplete="off">
+        <label for="addInput" aria-hidden="true">+</label>
+        <input id="addInput" aria-label="Add a task" placeholder="Add a task… e.g. Call Priya Fri 3pm p1">
+      </form>
+      <p class="hint">Understands today, tomorrow, mon–fri, a time like 3pm, and p1–p4. Enter to add.</p>
+      <div class="flow" id="flow"></div>
+      <div class="toast" id="toast" role="status" hidden><span id="toastMsg"></span><button type="button" id="undo">Undo</button></div>
+    </main>
+  </div>
+</div>
+
+<script>
+// Day index: 0 = Mon Nov 2 (today), 1 = Tue, … 4 = Fri, 8 = Mon Nov 10. null = no date.
+const DAYNAME = d => d === 0 ? "Today" : d === 1 ? "Tomorrow" : d <= 4 ? ["Mon","Tue","Wed","Thu","Fri"][d] : d === 7 ? "Next Mon" : `Nov ${2 + d}`;
+let tasks = [
+  {id:1, t:"Go/no-go on checkout rollback", p:1, d:0, kind:"Approval", from:"Ben Okafor"},
+  {id:4, t:"Board prep call", p:1, d:1, time:"8:00 AM", call:"Phone", from:"Board Office"},
+  {id:5, t:"Prepare Q3 ops summary", p:1, d:1, time:"8:00 AM", kind:"Action", from:"Board Office"},
+  {id:2, t:"Reply to Dana: contract redlines", p:1, d:1, kind:"Follow-up", from:"Dana Reyes", vip:1},
+  {id:3, t:"PLAT-2291 EU billing sync failing", p:1, d:1, kind:"Jira", from:"Ben Okafor"},
+  {id:6, t:"Q4 roadmap review", p:2, d:2, time:"10:00 AM", call:"Zoom", from:"Priya Shah", vip:1},
+  {id:7, t:"Approve Ravi's expense report", p:2, d:2, kind:"Approval", from:"Expensify"},
+  {id:8, t:"Vendor sync: Northwind", p:2, d:3, time:"11:00 AM", call:"Meet", from:"Marcus Webb"},
+  {id:9, t:"Dana Reyes, expansion pricing", p:2, d:3, time:"2:00 PM", call:"Phone", from:"Dana Reyes", vip:1},
+  {id:11, t:"Partnership kickoff", p:2, d:4, time:"1:00 PM", call:"Webex", from:"Lena Fischer"},
+  {id:12, t:"Benefits open enrollment", p:2, d:4, time:"5:00 PM", kind:"Deadline", from:"People Team"},
+  {id:10, t:"Send Q3 retention numbers", p:2, d:4, kind:"Action", from:"Priya Shah", vip:1},
+  {id:13, t:"Draft launch blog post", p:3, d:8, kind:"Asana", from:"Ravi Menon"},
+  {id:14, t:"CAB planning", p:3, d:10, time:"9:00 AM", call:"GoTo", from:"Ravi Menon"},
+  {id:15, t:"Sign Northwind MSA amendment", p:3, d:11, kind:"DocuSign", from:"Northwind Legal"},
+  {id:16, t:"Review PR #482 pricing flag", p:3, d:null, kind:"GitHub", from:"Sam Patel"},
+  {id:17, t:"Confirm under-$50 multi-year pricing", p:3, d:null, kind:"Docs comment", from:"Ravi Menon"},
+  {id:18, t:"Review competitive landscape slide", p:3, d:null, kind:"Action", from:"Priya Shah", vip:1},
+  {id:19, t:"Skim updated on-call policy", p:4, d:null, kind:"cc'd", from:"Ben Okafor"},
+];
+let nextId = 100, lastMoved = null, undoFn = null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mins = t => { const m = /(\d+)(?::(\d+))?\s*(AM|PM)/i.exec(t || ""); return m ? (+m[1] % 12 + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0) : 9999; };
+const SECTIONS = [["Today", t => t.d === 0], ["Tomorrow", t => t.d === 1], ["This week", t => t.d >= 2 && t.d <= 4], ["Later", t => t.d > 4], ["Someday", t => t.d === null]];
+
+function render() {
+  const open = tasks.filter(t => !t.done).length, urgent = tasks.filter(t => !t.done && t.p === 1).length;
+  document.getElementById("summary").textContent = `${open} open · ${urgent} urgent · ${tasks.filter(t => t.call && !t.done && t.d !== null && t.d <= 4).length} calls this week`;
+  document.getElementById("flow").innerHTML = SECTIONS.map(([name, f]) => {
+    const xs = tasks.filter(f).sort((a, b) => (a.d ?? 99) - (b.d ?? 99) || mins(a.time) - mins(b.time) || a.p - b.p);
+    if (!xs.length) return "";
+    return `<section class="sec" aria-label="${name}"><h2>${name}<span>${xs.length}</span></h2>` + xs.map(t => {
+      const when = [t.d > 1 && t.d !== null ? DAYNAME(t.d) : "", t.time || ""].filter(Boolean).join(" · ");
+      const act = t.call ? (t.call === "Phone" ? `<a class="btn join" href="#" aria-label="Call for ${esc(t.t)}">Call</a>` : `<a class="btn join" href="#" aria-label="Join ${esc(t.t)} on ${t.call}">Join</a>`) : "";
+      return `<div class="item p${t.p} ${t.call ? "call" : ""} ${t.done ? "done" : ""} ${lastMoved === t.id ? "moved" : ""}" data-id="${t.id}">
+        <span class="node" aria-hidden="true"></span>
+        <div class="line"><input type="checkbox" id="c${t.id}" ${t.done ? "checked" : ""}><label class="t" for="c${t.id}">${esc(t.t)}</label></div>
+        <div class="meta">${when ? `<span class="when">${when}</span>` : ""}<span>${esc(t.call || t.kind || "Task")}</span><span class="${t.vip ? "vip" : ""}">${t.vip ? "★ " : ""}${esc(t.from || "You")}</span></div>
+        <div class="acts">${act}<button type="button" class="btn prio" data-menu="prio" aria-haspopup="menu" aria-label="Priority P${t.p}, change">P${t.p}</button><button type="button" class="btn snooze" data-menu="snooze" aria-haspopup="menu">Snooze</button></div>
+      </div>`;
+    }).join("") + `</section>`;
+  }).join("");
+  lastMoved = null;
+}
+
+function synced(msg, undo) {
+  const s = document.getElementById("sync");
+  s.classList.add("busy"); s.querySelector("span").textContent = "Saving to Notion…";
+  setTimeout(() => { s.classList.remove("busy"); s.querySelector("span").textContent = "Synced with Notion · just now"; }, 500);
+  const toast = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg; undoFn = undo; toast.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => toast.hidden = true, 5000);
+}
+document.getElementById("undo").onclick = () => { if (undoFn) { undoFn(); render(); } document.getElementById("toast").hidden = true; };
+
+const app = document.getElementById("app");
+app.addEventListener("change", e => {
+  const item = e.target.closest(".item"); if (!item) return;
+  const t = tasks.find(x => x.id === +item.dataset.id); t.done = e.target.checked;
+  render(); synced(t.done ? `Done: ${t.t}` : `Reopened: ${t.t}`, () => t.done = !t.done);
+});
+
+let menu = null;
+function closeMenu(focusBack) { if (menu) { const b = menu._btn; menu.remove(); menu = null; if (focusBack) b.focus(); } }
+app.addEventListener("click", e => {
+  const b = e.target.closest("[data-menu]");
+  if (e.target.closest(".menu")) return;
+  closeMenu();
+  if (!b) return;
+  const t = tasks.find(x => x.id === +b.closest(".item").dataset.id);
+  menu = document.createElement("div"); menu.className = "menu"; menu.setAttribute("role", "menu"); menu._btn = b;
+  if (b.dataset.menu === "prio") {
+    menu.innerHTML = [1,2,3,4].map(p => `<button role="menuitem" class="p${p}" data-p="${p}"><span class="dot"></span>P${p} ${["Urgent","This week","Later","FYI"][p-1]}${p === t.p ? "<small>current</small>" : ""}</button>`).join("");
+  } else {
+    menu.innerHTML = [["Later today", 0], ["Tomorrow", 1], ["Friday", 4], ["Next week", 7], ["Someday (no date)", "none"]].filter(([, d]) => (d === "none" ? null : d) !== t.d)
+      .map(([l, d]) => `<button role="menuitem" data-d="${d}">${l}</button>`).join("");
+  }
+  const r = b.getBoundingClientRect(), ar = app.getBoundingClientRect();
+  menu.style.top = (r.bottom - ar.top + 6) + "px"; menu.style.right = (ar.right - r.right) + "px";
+  menu.onclick = ev => {
+    const it = ev.target.closest("button"); if (!it) return;
+    if (it.dataset.p) { const old = t.p; t.p = +it.dataset.p; synced(`Priority → P${t.p}: ${t.t}`, () => t.p = old); }
+    else { const old = t.d, oldTime = t.time; t.d = it.dataset.d === "none" ? null : +it.dataset.d; if (!t.call) t.time = undefined; synced(`Snoozed to ${it.textContent}: ${t.t}`, () => { t.d = old; t.time = oldTime; }); }
+    lastMoved = t.id; closeMenu(); render();
+    document.querySelector(`.item[data-id="${t.id}"] .prio`)?.focus();
+  };
+  menu.onkeydown = ev => {
+    const items = [...menu.querySelectorAll("button")], i = items.indexOf(document.activeElement);
+    if (ev.key === "ArrowDown") { ev.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (ev.key === "ArrowUp") { ev.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    if (ev.key === "Escape") { ev.preventDefault(); closeMenu(true); }
+  };
+  app.appendChild(menu); menu.querySelector("button").focus();
+});
+document.addEventListener("click", e => { if (!e.target.closest(".app")) closeMenu(); });
+
+document.getElementById("addForm").onsubmit = e => {
+  e.preventDefault();
+  const input = document.getElementById("addInput"); let s = input.value.trim(); if (!s) return;
+  let p = 3, d = null, time;
+  s = s.replace(/\bp([1-4])\b/i, (_, n) => { p = +n; return ""; });
+  s = s.replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i, (_, h, m, a) => { time = `${h}:${m || "00"} ${a.toUpperCase()}`; return ""; });
+  const days = {today:0, tomorrow:1, mon:7, tue:1, wed:2, thu:3, fri:4};
+  s = s.replace(/\b(today|tomorrow|mon|tue|wed|thu|fri)[a-z]*\b/i, (_, w) => { d = days[w.toLowerCase().slice(0, w.length > 3 && !["today","tomorrow"].includes(w.toLowerCase()) ? 3 : w.length)] ?? days[w.toLowerCase()]; return ""; });
+  if (d === null && p <= 2) d = p === 1 ? 0 : 4;
+  const t = {id: nextId++, t: s.replace(/\s{2,}/g, " ").trim(), p, d, time, kind: "Added by you", from: "You"};
+  if (/^(call|meet)\b/i.test(t.t) && time) { t.call = "Phone"; }
+  tasks.push(t); lastMoved = t.id; input.value = ""; render();
+  synced(`Added: ${t.t}`, () => tasks = tasks.filter(x => x !== t));
+};
+
+// picker
+const ids = ["quiet", "editorial", "aurora"], sel = document.querySelector(".variant-picker-select select");
+let cur = new URLSearchParams(location.search).get("__variant"); if (!ids.includes(cur)) cur = "quiet";
+function go(v) { cur = v; app.className = "app s-" + v; const u = new URL(location); u.searchParams.set("__variant", v); history.replaceState(null, "", u);
+  document.querySelectorAll(".variant-picker button").forEach(b => b.setAttribute("aria-pressed", b.dataset.variant === v)); sel.value = v; }
+document.querySelectorAll(".variant-picker button").forEach(b => b.onclick = () => go(b.dataset.variant));
+sel.onchange = () => go(sel.value);
+addEventListener("keydown", e => {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  if (e.target.closest("input, textarea, select, [contenteditable], .menu")) return;
+  const i = ids.indexOf(cur);
+  if (["ArrowRight","ArrowDown"].includes(e.key)) { e.preventDefault(); go(ids[(i + 1) % 3]); }
+  else if (["ArrowLeft","ArrowUp"].includes(e.key)) { e.preventDefault(); go(ids[(i + 2) % 3]); }
+  else if (e.key.toLowerCase() === "h") document.body.classList.toggle("picker-hidden");
+});
+go(cur); render();
+</script>
+</body>
+</html>

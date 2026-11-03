@@ -1,0 +1,16 @@
+From: Ben Okafor <ben@acme.example>
+To: Alex Kim <alex@acme.example>
+Cc: Priya Shah <priya@acme.example>
+Subject: URGENT: need your go/no-go on checkout rollback
+Date: Mon, 02 Nov 2026 09:05:00 -0800
+Message-ID: <rollback-024@acme.example>
+Importance: High
+Content-Type: text/plain; charset=utf-8
+
+Alex,
+
+Checkout conversion dropped 18% since this morning's release. We have a rollback ready but it also reverts the new tax logic Finance asked for.
+
+Need your go/no-go ASAP - this is a blocker for the on-call team.
+
+Ben

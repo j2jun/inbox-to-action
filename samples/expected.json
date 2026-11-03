@@ -1,0 +1,47 @@
+{
+  "_about": "Answer key for the sample emails. Used to measure NFR-2 accuracy. Titles are matched loosely: a task matches if its title contains every word in title_has (case-insensitive).",
+  "context": {
+    "user": "Alex Kim <alex@acme.example>",
+    "timezone": "America/Los_Angeles",
+    "now": "2026-11-02T09:30:00-08:00",
+    "vip": ["priya@acme.example", "dana.reyes@bigclient.example"]
+  },
+  "priority_rules_assumed": {
+    "P1": "due or starts within 24h, or urgency language (ASAP/URGENT/blocker) from a non-bulk sender",
+    "P2": "due or starts within 7 days",
+    "P3": "due later than 7 days, or no date",
+    "P4": "cc'd only, and the ask is aimed at others"
+  },
+  "emails": {
+    "01_zoom_invite.eml":        {"tasks": [{"type": "Call", "platform": "Zoom", "title_has": ["Q4", "roadmap"], "due": "2026-11-04T10:00:00-08:00", "priority": "P2"}]},
+    "02_google_meet_invite.eml": {"tasks": [{"type": "Call", "platform": "Meet", "title_has": ["Vendor", "sync"], "due": "2026-11-04T13:00:00-08:00", "priority": "P2", "uid": "7k2v9q1northwind@google.com"}]},
+    "03_google_meet_update.eml": {"updates_uid": "7k2v9q1northwind@google.com", "tasks": [{"type": "Call", "platform": "Meet", "title_has": ["Vendor", "sync"], "due": "2026-11-05T11:00:00-08:00", "priority": "P2"}]},
+    "04_teams_invite.eml":       {"tasks": [{"type": "Call", "platform": "Teams", "title_has": ["Hiring", "debrief"], "due": "2026-11-02T15:00:00-08:00", "priority": "P1", "uid": "040000008200E00074C5B7101A82E00800000000D1A2B3C4"}]},
+    "05_teams_cancel.eml":       {"updates_uid": "040000008200E00074C5B7101A82E00800000000D1A2B3C4", "status": "Cancelled", "tasks": []},
+    "06_webex_invite.eml":       {"tasks": [{"type": "Call", "platform": "Webex", "title_has": ["Partnership", "kickoff"], "due": "2026-11-06T13:00:00-08:00", "priority": "P2"}]},
+    "07_phone_call_request.eml": {"tasks": [{"type": "Call", "platform": "Phone", "title_has": ["Dana"], "due": "2026-11-05T14:00:00-08:00", "priority": "P2", "phone": "+14155550142"}]},
+    "08_dialin_conference.eml":  {"tasks": [
+      {"type": "Call", "platform": "Phone", "title_has": ["Board", "prep"], "due": "2026-11-03T08:00:00-08:00", "priority": "P1"},
+      {"type": "Action", "title_has": ["Q3", "ops", "summary"], "due": "2026-11-03T08:00:00-08:00", "priority": "P1"}
+    ]},
+    "09_gotomeeting_invite.eml": {"tasks": [{"type": "Call", "platform": "Other", "title_has": ["Advisory", "board"], "due": "2026-11-12T09:00:00-08:00", "priority": "P3"}]},
+    "10_past_invite.eml":        {"skip": "invite already in the past"},
+    "11_direct_request.eml":     {"tasks": [
+      {"type": "Action", "title_has": ["Q3", "retention"], "due": "2026-11-06", "priority": "P2"},
+      {"type": "Action", "title_has": ["competitive"], "due": null, "priority": "P3"}
+    ]},
+    "12_jira_assigned.eml":      {"tasks": [{"type": "Assignment", "title_has": ["PLAT-2291"], "due": "2026-11-03", "priority": "P1", "source_item": "https://acme.atlassian.net/browse/PLAT-2291"}]},
+    "13_asana_task.eml":         {"tasks": [{"type": "Assignment", "title_has": ["launch", "blog"], "due": "2026-11-10", "priority": "P3", "source_item": "https://app.asana.com/0/120034/120098771"}]},
+    "14_github_review.eml":      {"tasks": [{"type": "Assignment", "title_has": ["Review", "482"], "due": null, "priority": "P3", "source_item": "https://github.com/acme/web-app/pull/482"}]},
+    "15_expense_approval.eml":   {"tasks": [{"type": "Approval", "title_has": ["expense", "Ravi"], "due": "2026-11-04", "priority": "P2"}]},
+    "16_docusign.eml":           {"tasks": [{"type": "Approval", "title_has": ["Northwind", "MSA"], "due": "2026-11-13", "priority": "P3"}]},
+    "17_deadline_reminder.eml":  {"tasks": [{"type": "Deadline", "title_has": ["enrollment"], "due": "2026-11-06T17:00:00-08:00", "priority": "P2"}]},
+    "18_follow_up_vip.eml":      {"tasks": [{"type": "Follow-up", "title_has": ["redlines"], "due": "2026-11-03", "priority": "P1"}]},
+    "19_gdoc_comment.eml":       {"tasks": [{"type": "Action", "title_has": ["pricing"], "due": null, "priority": "P3"}]},
+    "20_cc_fyi.eml":             {"tasks": [{"type": "Action", "title_has": ["on-call", "policy"], "due": null, "priority": "P4"}]},
+    "21_newsletter.eml":         {"skip": "newsletter"},
+    "22_receipt.eml":            {"skip": "receipt"},
+    "23_marketing.eml":          {"skip": "marketing"},
+    "24_urgent_asap.eml":        {"tasks": [{"type": "Approval", "title_has": ["rollback"], "due": "2026-11-02", "priority": "P1"}]}
+  }
+}

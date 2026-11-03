@@ -1,0 +1,17 @@
+From: Ben Okafor <ben@acme.example>
+To: eng-leads@acme.example
+Cc: Alex Kim <alex@acme.example>
+Subject: Updated on-call policy
+Date: Mon, 02 Nov 2026 07:15:00 -0800
+Message-ID: <oncall-policy-020@acme.example>
+Content-Type: text/plain; charset=utf-8
+
+Team,
+
+The updated on-call policy is live. Leads, please skim it when you have time and flag anything that doesn't work for your team.
+
+https://wiki.acme.example/eng/on-call-policy
+
+Alex - cc'ing you for visibility.
+
+Ben

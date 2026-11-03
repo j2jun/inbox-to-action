@@ -1,0 +1,7 @@
+.env
+.env.*
+CLAUDE.local.md
+.claude/settings.local.json
+.superpowers/
+__pycache__/
+.pytest_cache/

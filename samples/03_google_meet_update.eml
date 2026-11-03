@@ -1,0 +1,41 @@
+From: Google Calendar <calendar-notification@google.com>
+Sender: Marcus Webb <marcus@northwind.example>
+To: alex@acme.example
+Subject: Updated invitation: Vendor sync - Northwind @ Thu Nov 5, 2026 11am - 11:30am (PST) (alex@acme.example)
+Date: Mon, 02 Nov 2026 10:05:00 -0800
+Message-ID: <vendor-sync-update-003@google.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+
+This event has been changed.
+
+Vendor sync - Northwind
+When: CHANGED: Thursday Nov 5, 2026 11am - 11:30am (PST)
+Organizer: Marcus Webb <marcus@northwind.example>
+
+Join with Google Meet: https://meet.google.com/xqv-hkdp-rme
+
+--b1
+Content-Type: text/calendar; charset=utf-8; method=REQUEST
+Content-Disposition: attachment; filename="invite.ics"
+
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTART:20261105T190000Z
+DTEND:20261105T193000Z
+UID:7k2v9q1northwind@google.com
+SEQUENCE:1
+ORGANIZER;CN=Marcus Webb:mailto:marcus@northwind.example
+SUMMARY:Vendor sync - Northwind
+LOCATION:https://meet.google.com/xqv-hkdp-rme
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+
+--b1--

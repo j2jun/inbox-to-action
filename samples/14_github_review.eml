@@ -1,0 +1,16 @@
+From: Sam Patel <notifications@github.com>
+To: acme/web-app <web-app@noreply.github.com>
+Cc: Review requested <review_requested@noreply.github.com>
+Subject: [acme/web-app] Add pricing page experiment flag (PR #482)
+Date: Mon, 02 Nov 2026 08:20:00 -0800
+Message-ID: <acme/web-app/pull/482@github.com>
+List-ID: acme/web-app <web-app.acme.github.com>
+X-GitHub-Reason: review_requested
+Content-Type: text/plain; charset=utf-8
+
+@samp requested your review on: acme/web-app#482 Add pricing page experiment flag.
+
+Adds a feature flag so we can A/B the new pricing page copy.
+
+View it on GitHub:
+https://github.com/acme/web-app/pull/482
