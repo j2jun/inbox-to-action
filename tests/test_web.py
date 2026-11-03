@@ -187,3 +187,12 @@ def test_webhook_ai_failure_returns_503(store):
     a = make_app(store, Config(USER, set(), TZ), boom, now_fn=lambda: NOW, env=ENV)
     _, p = _payload("11")
     assert call(a, "POST", "/webhook/email", p, headers={"X-Webhook-Secret": "hook-secret"})["status"] == 503
+
+
+def test_unconfigured_production_app_answers_503(monkeypatch):
+    import inbox_to_action.web as web
+    for k in ("NOTION_TOKEN", "NOTION_DATABASE_ID", "APP_PASSWORD", "SESSION_SECRET", "WEBHOOK_SECRET"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(web, "_app", None)
+    r = call(web.app, "GET", "/api/tasks")
+    assert r["status"] == 503 and r["json"] == {"error": "not configured"}

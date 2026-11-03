@@ -202,12 +202,21 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
 
 
 _app = None
+REQUIRED_ENV = ("NOTION_TOKEN", "NOTION_DATABASE_ID", "ANTHROPIC_API_KEY", "WEBHOOK_SECRET", "APP_PASSWORD",
+                "SESSION_SECRET", "USER_EMAIL")
 
 
 def app(environ, start_response):
     """Production entry point: built on first request from env vars."""
     global _app
     if _app is None:
+        missing = [k for k in REQUIRED_ENV if not os.environ.get(k)]
+        if missing:
+            log.error("not configured, missing env: %s", ", ".join(missing))  # names only, never values
+            payload = b'{"error": "not configured"}'
+            start_response("503 Service Unavailable", [("Content-Type", "application/json"),
+                                                       ("Content-Length", str(len(payload)))])
+            return [payload]
         from .ai import anthropic_call
         from .notion import NotionStore
         _app = make_app(NotionStore(os.environ["NOTION_TOKEN"], os.environ["NOTION_DATABASE_ID"]),
