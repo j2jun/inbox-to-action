@@ -130,3 +130,11 @@ def test_missing_message_id_gets_stable_synthetic_id():
     raw = (SAMPLES / "11_direct_request.eml").read_bytes().replace(b"Message-ID: <board-deck-011@acme.example>\n", b"")
     e1, e2 = parse_eml(raw), parse_eml(raw)
     assert e1.message_id and e1.message_id == e2.message_id and e1.message_id.endswith("@inbox-to-action>")
+
+
+def test_update_fails_closed_when_original_sender_unknown(load):
+    store = MemoryStore()
+    created = run(load("02"), store).created[0]
+    store.update(created.page_id, from_addr="")
+    out = run(load("03"), store)
+    assert out.skipped == "invite update from a different sender"
