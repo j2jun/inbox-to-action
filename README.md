@@ -129,6 +129,9 @@ python3 -m inbox_to_action.dev             # Today page on http://localhost:8000
 
 ## Setup
 
+### Quick setup (recommended)
+After `npx vercel login`, run **`python3 -m inbox_to_action.setup`** in your own terminal. It asks for each value with hidden input, creates the Notion database and saves every setting to Vercel. The manual steps below do the same thing.
+
 ### 1. Notion
 1. Create an integration at notion.so/my-integrations and copy its token.
 2. Share an empty Notion page with the integration and copy the page's id from its URL.
