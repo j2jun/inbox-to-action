@@ -34,25 +34,25 @@ def _docusign(e: Email) -> str:
 # sender: regex on the From address; when: extra condition; due: read a due date from the body
 TASK_TOOLS: list[dict] = [
     {"name": "Jira", "sender": r"@[\w.-]*\.atlassian\.net$", "type": "Assignment", "title": _jira,
-     "link": r"https://\S+/browse/[A-Z][A-Z0-9]+-\d+", "due": True},
+     "link": r"https://[\w-]+\.atlassian\.net/browse/[A-Z][A-Z0-9]+-\d+\b", "due": True},
     {"name": "Asana", "sender": r"@asana\.com$", "type": "Assignment",
      "title": lambda e: _after(r"assigned a task to you\s*\n+\s*([^\n]+)", e.body, e.subject),
-     "link": r"https://app\.asana\.com/\S+", "due": True},
+     "link": r"https://app\.asana\.com/[^\s<>\"]+", "due": True},
     {"name": "GitHub", "sender": r"^notifications@github\.com$", "type": "Assignment", "title": _github,
-     "link": r"https://github\.com/\S+/(?:pull|issues)/\d+", "due": False,
+     "link": r"https://github\.com/[\w.-]+/[\w.-]+/(?:pull|issues)/\d+", "due": False,
      "when": lambda e: e.headers.get("x-github-reason") in {"review_requested", "assign", "mention"}},
     {"name": "Expensify", "sender": r"@expensify\.com$", "type": "Approval",
      "title": lambda e: "Approve expense report: " + _after(r"approval:\s*(.+)$", e.subject, e.subject),
-     "link": r"https://www\.expensify\.com/report\S*", "due": True},
+     "link": r"https://www\.expensify\.com/report[^\s<>\"]*", "due": True},
     {"name": "DocuSign", "sender": r"@docusign\.net$", "type": "Approval", "title": _docusign,
      "link": None, "due": True},
     {"name": "Google Docs", "sender": r"^comments-noreply@docs\.google\.com$", "type": "Action",
      "title": lambda e: re.sub(r'^(.+?) mentioned you in "(.+)"$', r"Reply to \1 in \2", e.subject),
-     "link": r"https://docs\.google\.com/\S+", "due": False},
-    {"name": "Trello", "sender": r"@trello\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://trello\.com/c/\S+", "due": True},
-    {"name": "Linear", "sender": r"@linear\.app$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://linear\.app/\S+", "due": True},
-    {"name": "Monday", "sender": r"@monday\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://\S+\.monday\.com/\S+", "due": True},
-    {"name": "ClickUp", "sender": r"@(tasks\.)?clickup\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://app\.clickup\.com/\S+", "due": True},
+     "link": r"https://docs\.google\.com/[^\s<>\"]+", "due": False},
+    {"name": "Trello", "sender": r"@trello\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://trello\.com/c/[^\s<>\"]+", "due": True},
+    {"name": "Linear", "sender": r"@linear\.app$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://linear\.app/[^\s<>\"]+", "due": True},
+    {"name": "Monday", "sender": r"@monday\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://[\w-]+\.monday\.com/[^\s<>\"]+", "due": True},
+    {"name": "ClickUp", "sender": r"@(tasks\.)?clickup\.com$", "type": "Assignment", "title": lambda e: e.subject, "link": r"https://app\.clickup\.com/[^\s<>\"]+", "due": True},
 ]
 
 
@@ -62,7 +62,8 @@ def detect_tool_task(email: Email, now: datetime) -> list[Task] | None:
             continue
         if "when" in row and not row["when"](email):
             continue
-        link = re.search(row["link"], email.body) if row["link"] else None
+        # Links must start at a URL boundary so "https://evil.example/x.atlassian.net/..." can't match mid-string.
+        link = re.search(r"(?<![\w./-])" + row["link"], email.body) if row["link"] else None
         due_line = _DUE_LINE.search(email.body) if row["due"] else None
         return [Task(
             title=row["title"](email),

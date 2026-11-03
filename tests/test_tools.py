@@ -31,3 +31,14 @@ def test_tool_tasks(load, prefix):
 
 def test_unknown_sender(load):
     assert detect_tool_task(load("11"), NOW) is None
+
+
+@pytest.mark.parametrize("url", [
+    "https://evil.example/browse/PLAT-2291",
+    "https://evil.example/acme.atlassian.net/browse/PLAT-2291",
+    "https://acme.atlassian.net.evil.example/browse/PLAT-2291",
+])
+def test_source_link_host_is_pinned(load, url):
+    e = load("12")
+    e.body = e.body.replace("https://acme.atlassian.net/browse/PLAT-2291", url)
+    assert detect_tool_task(e, NOW)[0].source_item is None

@@ -52,3 +52,17 @@ def test_body_never_logged(load, caplog):
         extract_with_ai(load("11"), NOW, make_stub_call(FIXTURES))
         extract_with_ai(load("11"), NOW, lambda req: {})
     assert "retention numbers" not in caplog.text
+
+
+def _one(phone):
+    return lambda req: {"content": [{"type": "tool_use", "name": "record_tasks", "input": {"tasks": [
+        {"title": "Call", "type": "Call", "due": None, "platform": "Phone", "phone": phone}]}}]}
+
+
+def test_phone_must_be_valid_and_in_email(load):
+    e = load("07")
+    assert extract_with_ai(e, NOW, _one("+1 (415) 555-0142"))[0].phone == "+14155550142"
+    assert extract_with_ai(e, NOW, _one("+1 900 555 0199"))[0].phone is None   # not in the email
+    assert extract_with_ai(e, NOW, _one("javascript:alert(1)"))[0].phone is None
+    assert extract_with_ai(e, NOW, _one(12345))[0].phone is None
+    assert extract_with_ai(e, NOW, _one("415-555-0142"))[0].phone == "+14155550142"  # 10 digits: NANP

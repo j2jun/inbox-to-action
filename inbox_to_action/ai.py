@@ -100,6 +100,21 @@ def _due(value: str | None, now: datetime) -> date | datetime | None:
         return None
 
 
+def _phone(value, body: str) -> str | None:
+    """Accept a model-supplied number only if it is a plausible E.164 number whose digits appear in the email."""
+    if not isinstance(value, str):
+        return None
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 10 and not value.strip().startswith("+"):
+        digits = "1" + digits  # ponytail: assume North American numbers without a country code
+    candidate = "+" + digits
+    if not re.fullmatch(r"\+[1-9]\d{6,14}", candidate):
+        return None
+    body_digits = re.sub(r"\D", "", body)
+    national = digits[1:] if len(digits) == 11 and digits.startswith("1") else digits
+    return candidate if national in body_digits else None
+
+
 def extract_with_ai(email: Email, now: datetime, call_fn: Callable[[dict], dict]) -> list[Task]:
     try:
         response = call_fn(build_request(email, now))
@@ -117,7 +132,7 @@ def extract_with_ai(email: Email, now: datetime, call_fn: Callable[[dict], dict]
             type=item.get("type") if item.get("type") in TYPES else "Action",
             due=_due(item.get("due"), now),
             platform=item.get("platform") if item.get("platform") in PLATFORMS else None,
-            phone=item.get("phone"),
+            phone=_phone(item.get("phone"), email.body),
             from_name=email.from_name,
             from_addr=email.from_addr,
             message_id=email.message_id,
