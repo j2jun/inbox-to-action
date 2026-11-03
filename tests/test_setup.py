@@ -27,7 +27,7 @@ def test_run_setup_flows_values_to_vercel():
 
 def test_password_rules_reask():
     answers = iter([PAGE, ""])
-    secrets = iter(["t", "k", "short", "short", "long enough pass", "mismatch here!!", "long enough pass", "long enough pass"])
+    secrets = iter(["t", "k", "short", "long enough pass", "mismatch here!!", "long enough pass", "long enough pass"])
     saved, out = {}, []
     run_setup(ask=lambda q: next(answers), ask_secret=lambda q: next(secrets), create_db=lambda t, p: "db",
               set_env=lambda n, v: saved.__setitem__(n, v), say=out.append)
