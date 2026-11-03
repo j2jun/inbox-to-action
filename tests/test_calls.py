@@ -29,7 +29,7 @@ def test_join_link_and_phone(load):
 
 def test_ics_uid_and_sequence(load):
     t = detect_call(load("03"), NOW)
-    assert (t.uid, t.sequence, t.key) == ("7k2v9q1northwind@google.com", 1, "7k2v9q1northwind@google.com")
+    assert (t.uid, t.sequence, t.key) == ("7k2v9q1northwind@google.com", 1, "uid:calendar-notification@google.com:7k2v9q1northwind@google.com")
     assert t.due == datetime(2026, 11, 5, 11, 0, tzinfo=TZ)
 
 

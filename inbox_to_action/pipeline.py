@@ -78,7 +78,7 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
         existing = store.find(call.key)
         if existing:
             # Only the original sender may move, cancel or relink a meeting (blocks spoofed updates by UID).
-            if not existing.from_addr or email.from_addr != existing.from_addr:
+            if not existing.from_addr or email.from_addr.lower() != existing.from_addr.lower():
                 out.skipped = "invite update from a different sender"
                 return out
             if call.sequence >= existing.sequence:

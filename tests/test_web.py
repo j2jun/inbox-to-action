@@ -159,7 +159,7 @@ def test_webhook_multipart_ics(app, store):
     ctype = msg["Content-Type"]
     r = call(app, "POST", "/webhook/email", raw=raw, ctype=ctype, headers={"X-Webhook-Secret": "hook-secret"})
     assert r["status"] == 200 and r["json"]["created"] == 1
-    t = store.find("7k2v9q1northwind@google.com")
+    t = store.find("uid:calendar-notification@google.com:7k2v9q1northwind@google.com")
     assert t.platform == "Meet" and t.due.isoformat() == "2026-11-04T13:00:00-08:00"
 
 

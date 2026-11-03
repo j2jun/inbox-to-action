@@ -8,7 +8,7 @@ from inbox_to_action.notion import PROPERTY_NAMES, NotionError, NotionStore, pag
 
 CALL = Task(title="Vendor sync - Northwind", type="Call", due=datetime(2026, 11, 4, 13, tzinfo=TZ), platform="Meet",
             join_link="https://meet.google.com/xqv-hkdp-rme", from_name="Marcus Webb", from_addr="marcus@northwind.example",
-            source_email="https://mail.google.com/x", key="7k2v9q1northwind@google.com", uid="7k2v9q1northwind@google.com",
+            source_email="https://mail.google.com/x", key="uid:marcus@northwind.example:7k2v9q1northwind@google.com", uid="7k2v9q1northwind@google.com",
             priority="P2", reason="P2: due within 7 days", snippet="Agenda", page_id="p1")
 PHONE = Task(title="Board prep call", type="Call", due=datetime(2026, 11, 3, 8, tzinfo=TZ), platform="Phone",
              phone="+16465550110", key="<b@x>", page_id="p3", priority="P1")
@@ -124,6 +124,6 @@ def test_update_with_pipeline_field_set():
 
 
 def test_comma_in_sender_name_round_trips():
-    t = Task(title="x", type="Call", from_name="Okafor, Ben", from_addr="ben@acme.example", key="u1", page_id="p9")
+    t = Task(title="x", type="Call", from_name="Okafor, Ben", from_addr="ben@acme.example", key="<u1@x>", page_id="p9")
     back = page_to_task(fake_page(task_to_props(t), "p9"))
     assert (back.from_name, back.from_addr) == ("Okafor, Ben", "ben@acme.example")

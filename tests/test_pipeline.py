@@ -70,7 +70,7 @@ def test_update_keeps_locked_priority(load):
     task = run(load("02"), store).created[0]
     store.update(task.page_id, priority="P1", priority_locked=True)
     run(load("03"), store)
-    t = store.find("7k2v9q1northwind@google.com")
+    t = store.find("uid:calendar-notification@google.com:7k2v9q1northwind@google.com")
     assert t.priority == "P1" and t.due == datetime(2026, 11, 5, 11, tzinfo=TZ)
 
 
@@ -109,9 +109,10 @@ def test_update_from_different_sender_is_rejected(load):
     spoof.from_addr = "attacker@evil.example"
     spoof.body = spoof.body.replace("https://meet.google.com/xqv-hkdp-rme", "https://meet.google.com/evil-link")
     out = run(spoof, store)
-    assert out.skipped == "invite update from a different sender" and not out.updated
-    t = store.find("7k2v9q1northwind@google.com")
+    assert not out.updated  # a different sender can't reach the real meeting's key
+    t = store.find("uid:calendar-notification@google.com:7k2v9q1northwind@google.com")
     assert t.join_link == "https://meet.google.com/xqv-hkdp-rme"
+    assert t.due == datetime(2026, 11, 4, 13, tzinfo=TZ)
 
 
 def test_message_id_prefix_is_exact(load):
@@ -172,7 +173,7 @@ def test_update_without_link_keeps_stored_link(load):
     upd = load("03")
     upd.body = upd.body.replace("https://meet.google.com/xqv-hkdp-rme", "")
     run(upd, store)
-    assert store.find("7k2v9q1northwind@google.com").join_link == "https://meet.google.com/xqv-hkdp-rme"
+    assert store.find("uid:calendar-notification@google.com:7k2v9q1northwind@google.com").join_link == "https://meet.google.com/xqv-hkdp-rme"
 
 
 def test_ai_failure_raises_so_zapier_retries(load):
@@ -199,3 +200,20 @@ def test_link_key_cannot_be_squatted_by_another_sender(load):
     run(squat, store)
     real = run(_no_ics(load, "02"), store)
     assert [t.platform for t in real.created] == ["Meet"]
+
+
+def test_uid_cannot_be_squatted_by_another_sender(load):
+    store = MemoryStore()
+    squat = load("02")
+    squat.from_addr, squat.message_id = "attacker@evil.example", "<squat2@x>"
+    run(squat, store)
+    real = run(load("02"), store)
+    assert [t.platform for t in real.created] == ["Meet"]
+
+
+def test_message_id_cannot_mimic_a_call_key(load):
+    from inbox_to_action.parse import email_from_payload
+    e = load("11")
+    p = {"message_id": "link:calendar-notification@google.com:https://meet.google.com/xqv-hkdp-rme",
+         "from": "x <x@y.z>", "to": USER, "subject": "s", "date": "Mon, 02 Nov 2026 08:45:00 -0800", "body": "hi"}
+    assert email_from_payload(p, None).message_id.startswith("<")

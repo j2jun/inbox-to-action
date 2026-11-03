@@ -77,7 +77,7 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
         from_name=email.from_name,
         from_addr=email.from_addr,
         message_id=email.message_id,
-        key=ev.uid if ev else _link_key(link, email.from_addr) or email.message_id,
+        key=f"uid:{email.from_addr.lower()}:{ev.uid}" if ev else _link_key(link, email.from_addr) or email.message_id,
         uid=ev.uid if ev else None,
         sequence=ev.sequence if ev else 0,
         status="Cancelled" if cancelled else "To do",
