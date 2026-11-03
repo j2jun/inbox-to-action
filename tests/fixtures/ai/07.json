@@ -1,0 +1,27 @@
+{
+  "message_id": "<dana-call-007@bigclient.example>",
+  "response": {
+    "id": "msg_stub_07",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_07",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Call Dana Reyes about expansion pricing",
+              "type": "Call",
+              "due": "2026-11-05T14:00:00-08:00",
+              "platform": "Phone",
+              "phone": "+14155550142"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

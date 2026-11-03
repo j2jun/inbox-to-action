@@ -1,0 +1,27 @@
+{
+  "message_id": "<rollback-024@acme.example>",
+  "response": {
+    "id": "msg_stub_24",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_24",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Give go/no-go on checkout rollback",
+              "type": "Approval",
+              "due": "2026-11-02",
+              "platform": null,
+              "phone": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

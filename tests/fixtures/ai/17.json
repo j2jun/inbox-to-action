@@ -1,0 +1,27 @@
+{
+  "message_id": "<open-enrollment-017@acme.example>",
+  "response": {
+    "id": "msg_stub_17",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_17",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Complete benefits open enrollment",
+              "type": "Deadline",
+              "due": "2026-11-06T17:00:00-08:00",
+              "platform": null,
+              "phone": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

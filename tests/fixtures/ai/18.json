@@ -1,0 +1,27 @@
+{
+  "message_id": "<dana-redlines-018@bigclient.example>",
+  "response": {
+    "id": "msg_stub_18",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_18",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Respond to Dana on contract redlines",
+              "type": "Follow-up",
+              "due": "2026-11-03",
+              "platform": null,
+              "phone": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

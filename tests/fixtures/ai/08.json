@@ -1,0 +1,27 @@
+{
+  "message_id": "<board-prep-008@acme.example>",
+  "response": {
+    "id": "msg_stub_08",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_08",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Prepare Q3 ops summary",
+              "type": "Action",
+              "due": "2026-11-03T08:00:00-08:00",
+              "platform": null,
+              "phone": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

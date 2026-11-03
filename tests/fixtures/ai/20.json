@@ -1,0 +1,27 @@
+{
+  "message_id": "<oncall-policy-020@acme.example>",
+  "response": {
+    "id": "msg_stub_20",
+    "type": "message",
+    "role": "assistant",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_stub_20",
+        "name": "record_tasks",
+        "input": {
+          "tasks": [
+            {
+              "title": "Skim updated on-call policy",
+              "type": "Action",
+              "due": null,
+              "platform": null,
+              "phone": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
