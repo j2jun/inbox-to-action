@@ -75,6 +75,9 @@ def vercel_set(name: str, value: str) -> None:
 def preflight() -> None:
     """Fail before asking for any secret if Vercel isn't ready."""
     from pathlib import Path
+    if not sys.stdin.isatty():
+        sys.exit("This needs a real terminal for hidden key entry. Open the Terminal app and run:\n"
+                 "  cd ~/inbox-to-action && python3 -m inbox_to_action.setup")
     if not Path(".vercel/project.json").exists():
         sys.exit("Run this from the inbox-to-action folder (cd ~/inbox-to-action), then try again.")
     if subprocess.run(["npx", "vercel", "whoami"], capture_output=True).returncode != 0:
