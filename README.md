@@ -149,6 +149,14 @@ After `npx vercel login`, run **`python3 -m inbox_to_action.setup`** in your own
 3. Create the database: `NOTION_TOKEN=… python3 -m inbox_to_action.notion setup <page_id>`. It prints the database id.
 4. In Notion, add a **Calls** calendar view (filter Type = Call) and an **All tasks** table view.
 
+### 1b. TickTick (instead of Notion)
+Set `TICKTICK_TOKEN` and the app writes to TickTick instead of Notion. The Today page, Undo and dedupe all work the same way.
+1. At developer.ticktick.com → Manage Apps, create an app. Set its redirect URI to `http://localhost:8765/callback`.
+2. In your own terminal, run `TICKTICK_CLIENT_ID=… TICKTICK_CLIENT_SECRET=… python3 -m inbox_to_action.ticktick auth`. It opens TickTick so you can approve access, creates an **Inbox to Action** list, and saves `TICKTICK_TOKEN` and `TICKTICK_PROJECT_ID` to `.env.local`. Neither value is printed.
+3. Add those two values to Vercel in place of `NOTION_TOKEN` and `NOTION_DATABASE_ID`.
+
+Each task's note in TickTick shows the join link, the sender, the reason for its priority and a link to the email. The app's metadata is stored after the `— i2a:` line, so edit only the text above it. Tasks you add to that list directly in TickTick also show up on the Today page.
+
 ### 2. Environment variables (Vercel project settings)
 | Name | Value |
 |---|---|

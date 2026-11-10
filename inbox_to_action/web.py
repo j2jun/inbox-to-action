@@ -17,7 +17,7 @@ from .quickadd import parse_quick_add
 
 log = logging.getLogger(__name__)
 MAX_BODY = 2_000_000
-PAGE_ID = re.compile(r"^([0-9a-fA-F-]{32,36}|mem-\d+)$")
+PAGE_ID = re.compile(r"^([0-9a-fA-F-]{24,36}|mem-\d+)$")  # TickTick ids are 24 hex, Notion 32–36
 PRIORITIES = {"P1", "P2", "P3", "P4"}
 
 
@@ -202,15 +202,26 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
 
 
 _app = None
-REQUIRED_ENV = ("NOTION_TOKEN", "NOTION_DATABASE_ID", "ANTHROPIC_API_KEY", "WEBHOOK_SECRET", "APP_PASSWORD",
-                "SESSION_SECRET", "USER_EMAIL")
+REQUIRED_ENV = ("ANTHROPIC_API_KEY", "WEBHOOK_SECRET", "APP_PASSWORD", "SESSION_SECRET", "USER_EMAIL")
+TICKTICK_ENV = ("TICKTICK_TOKEN", "TICKTICK_PROJECT_ID")
+NOTION_ENV = ("NOTION_TOKEN", "NOTION_DATABASE_ID")
+
+
+def make_store(env, config: Config):
+    """TickTick when its env vars are set, else Notion."""
+    if env.get("TICKTICK_TOKEN"):
+        from .ticktick import TickTickStore
+        return TickTickStore(env["TICKTICK_TOKEN"], env["TICKTICK_PROJECT_ID"], config.tz)
+    from .notion import NotionStore
+    return NotionStore(env["NOTION_TOKEN"], env["NOTION_DATABASE_ID"])
 
 
 def app(environ, start_response):
     """Production entry point: built on first request from env vars."""
     global _app
     if _app is None:
-        missing = [k for k in REQUIRED_ENV if not os.environ.get(k)]
+        store_env = TICKTICK_ENV if os.environ.get("TICKTICK_TOKEN") else NOTION_ENV
+        missing = [k for k in REQUIRED_ENV + store_env if not os.environ.get(k)]
         if missing:
             log.error("not configured, missing env: %s", ", ".join(missing))  # names only, never values
             payload = b'{"error": "not configured"}'
@@ -218,7 +229,6 @@ def app(environ, start_response):
                                                        ("Content-Length", str(len(payload)))])
             return [payload]
         from .ai import anthropic_call
-        from .notion import NotionStore
-        _app = make_app(NotionStore(os.environ["NOTION_TOKEN"], os.environ["NOTION_DATABASE_ID"]),
-                        Config.from_env(), anthropic_call)
+        config = Config.from_env()
+        _app = make_app(make_store(os.environ, config), config, anthropic_call)
     return _app(environ, start_response)
