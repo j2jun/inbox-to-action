@@ -62,11 +62,10 @@ def _trusted(email: Email, config: Config) -> bool:
         # ponytail: Zapier payloads carry no auth headers, so a spoofed VIP / trusted-domain From is trusted
         # there; Gmail's spam filter is the backstop. Pass the header through Zapier to close this.
         return True
-    # Header present: require a positive pass aligned with the sender's domain, not merely "no fail".
-    aligned = lambda d: "." in d and (d == domain or domain.endswith("." + d) or d.endswith("." + domain))
-    return any(method == "dmarc" and result == "pass" and props.get("header.from") == domain
-               or method == "dkim" and result == "pass" and aligned(props.get("header.d", ""))
-               for method, result, props in auth_results(auth))
+    # Header present: trust rests on exactly one DMARC pass for the sender's own domain (DMARC already
+    # requires an aligned SPF or DKIM pass). Senders without DMARC wait in Review.
+    dmarc = [(r, p) for m, r, p in auth_results(auth) if m == "dmarc"]
+    return len(dmarc) == 1 and dmarc[0][0] == "pass" and dmarc[0][1].get("header.from") == domain
 
 
 AUTHSERV_IDS = {"mx.google.com"}  # whose Authentication-Results count: the receiving server (Gmail)
@@ -90,17 +89,17 @@ def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
             continue
         if ch == "\\" and (quoted or depth):
             escaped = True
-        elif quoted:  # quoted text is opaque at any depth: a ")" or ";" inside it ends nothing
+        elif ch == '"' and depth:
+            return []  # '"' is plain text inside a comment (RFC 5322); we can't read it the same way, fail closed
+        elif quoted:
             if ch == '"':
                 quoted = False
-                if depth == 0:
-                    current.append('"')
-            elif depth == 0:
+                current.append('"')
+            else:
                 current.append(ch if ch.isalnum() or ch in ".@_-" else "_")  # no '=', ';' or spaces survive
         elif ch == '"':
             quoted = True
-            if depth == 0:
-                current.append('"')
+            current.append('"')
         elif ch == "(":
             depth += 1
         elif ch == ")":
@@ -130,10 +129,10 @@ def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
             return []  # anything unexpected: don't guess which part is real
         props = {}
         for w in words[1:]:
-            pm = re.fullmatch(r"([a-z][\w-]*\.[\w-]+)=(\"[\w.@-]*\"|[^\s\"]+)", w, re.I)
+            pm = re.fullmatch(r"([a-z][\w-]*\.[\w-]+)=((?:\"[\w.@-]*\"|[^\s\"])+)", w, re.I)
             if not pm:
                 return []
-            props[pm.group(1).lower()] = pm.group(2).strip('"').lower()
+            props[pm.group(1).lower()] = pm.group(2).replace('"', "").lower()
         results.append((m.group(1).lower(), m.group(2).lower(), props))
     if sum(method == "dmarc" for method, _, _ in results) > 1:
         return []  # one message has one DMARC verdict; two means something was injected

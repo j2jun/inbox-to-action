@@ -177,7 +177,8 @@ def test_outside_sender_ai_tasks_wait_for_review(load):
     assert status(frm="stranger@elsewhere.example") == "Review"        # outside sender
     assert status(frm="priya@acme.example", auth="mx.google.com; dkim=fail") == "Review"   # forged
     assert status(frm="priya@acme.example", auth="mx.google.com; spf=none") == "Review"    # no positive pass
-    assert status(frm="priya@acme.example", auth="mx.google.com; dkim=pass header.d=acme.example") == "To do"
+    assert status(frm="priya@acme.example", auth="mx.google.com; dmarc=pass header.from=acme.example") == "To do"
+    assert status(frm="priya@acme.example", auth="mx.google.com; dkim=pass header.d=acme.example") == "Review"  # no DMARC
     assert status(frm="priya@acme.example", auth="mx.google.com; dkim=pass header.d=evil.example") == "Review"
     # A Gmail user must not trust every @gmail.com stranger: same-domain trust only comes from TRUSTED_DOMAINS.
     gmail = Config("alex@gmail.com", set(), NOW.tzinfo)
@@ -246,8 +247,7 @@ def test_auth_results_parsed_not_pattern_matched():
     config = Config("alex@acme.example", set(), NOW.tzinfo, trusted_domains={"acme.example"})
     ok = lambda auth: _trusted(_email(frm="priya@acme.example", auth=auth), config)
     assert ok("mx.google.com; dmarc=pass (p=NONE) header.from=acme.example")
-    assert ok("mx.google.com; dkim=pass header.i=@acme.example header.s=s1 header.d=acme.example")
-    assert ok("mx.google.com; dkim=pass header.d=mail.acme.example")                        # subdomain signer
+    assert not ok("mx.google.com; dkim=pass header.d=acme.example")                         # DKIM alone isn't enough
     assert not ok("mx.google.com; dkim=pass header.d=acme.example.evil.example")            # suffix trick
     assert not ok("mx.google.com; dkim=fail (dmarc=pass header.from=acme.example)")         # pass only in a comment
     assert not ok('mx.google.com; spf=pass smtp.mailfrom="dmarc=pass"@evil.example')       # pass inside another field
@@ -331,3 +331,20 @@ def test_review_round_ten_bypasses_closed():
     start = time.perf_counter()
     _html_to_text("<style>.x" + ":is(" * 20_000 + ")" * 20_000 + "{color:red}</style><p>x</p>")
     assert time.perf_counter() - start < 1
+
+
+def test_attribute_and_quoted_selector_text_cannot_fake_hover():
+    cases = [
+        '<style>.x[title=":hover"]{display:none}</style><span class="x" title=":hover">secret</span>',
+        '<style>.x[title="::before"]{display:none}</style><span class="x" title="::before">secret</span>',
+        '<style>.x[title=":hover{display:none}</style><span class="x" title="a">secret</span>',  # unbalanced
+    ]
+    for c in cases:
+        text = _html_to_text("<span>keep</span>" + c)
+        assert "secret" not in text and "keep" in text, c
+
+
+def test_quote_inside_comment_fails_closed():
+    from inbox_to_action.pipeline import auth_results
+    assert auth_results('mx.google.com; spf=pass (domain of "x) dmarc=pass header.from=acme.example (" ok)') == []
+    assert auth_results('mx.google.com; spf=pass smtp.mailfrom="a b"@x.example; dmarc=pass header.from=x.example')

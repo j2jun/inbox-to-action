@@ -211,14 +211,25 @@ def _rule(selector: str, body: str, order: int, alt_scheme: bool = False) -> _Ru
     last = re.sub(r"::?(first-line|first-letter)\b", "", last, flags=re.I)  # styles the element's own text
     # Keep only top-level text: a :hover inside :not()/:is()/:where()/:has() doesn't make the rule hover-only.
     # One linear pass; unbalanced parentheses mean we can't tell, so the rule applies (fail closed).
-    top, depth = [], 0
+    # Attribute selectors [...] and quoted strings are skipped too, so '[title=":hover"]' can't fake it.
+    top, depth, bracket, quote = [], 0, False, ""
     for ch in last:
-        depth += ch == "("
-        if depth == 0:
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif bracket:
+            bracket = ch != "]"
+        elif ch == "[":
+            bracket = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+        elif depth == 0:
             top.append(ch)
-        depth -= ch == ")" and depth > 0
-    top_level = "".join(top) if depth == 0 else ""
-    if not last or "::" in last or _INTERACTIVE.search(top_level):  # other pseudo-elements; hover/focus-only rules
+    top_level = "".join(top) if not (depth or bracket or quote) else ""
+    if not last or "::" in top_level or _INTERACTIVE.search(top_level):  # other pseudo-elements; hover/focus-only rules
         return None
     last = re.sub(r":[\w-]+(\([^)]*\))?", "", last)  # :first-child, :not(…), …: apply anyway (fail closed)
     if not last:
