@@ -59,7 +59,10 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
         target = (parts.hostname or "") + parts.path
         for name, pattern in PLATFORMS:
             if pattern.search(target):
-                platform, link = name, url
+                # Rebuild from the checked host: browsers read "\" and "@" differently from urlsplit,
+                # so the raw string could open a different host than the one we matched.
+                platform = name
+                link = f"https://{parts.hostname}{parts.path}" + (f"?{parts.query}" if parts.query else "")
                 break
         if platform:
             break

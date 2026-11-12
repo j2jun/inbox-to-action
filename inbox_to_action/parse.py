@@ -3,6 +3,7 @@ import email
 import email.policy
 import hashlib
 import html
+from html.parser import HTMLParser
 import re
 from datetime import datetime, timezone
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
@@ -14,15 +15,54 @@ def _addrs(value: str | None) -> list[str]:
     return [a.lower() for _, a in getaddresses([value or ""]) if a]
 
 
-_HIDDEN = re.compile(
-    r"(?is)<(\w+)[^>]*\bstyle\s*=\s*[\"'][^\"']*(display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0)[^>]*>.*?</\1>")
+_HIDING = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0(\.0*)?\s*(;|$)"
+                     r"|max-height\s*:\s*0|(?<![\w-])(height|width)\s*:\s*0", re.I)
+_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+
+class _VisibleHTML(HTMLParser):
+    """Rebuilds the HTML without subtrees the reader can't see, so hidden text never reaches the model."""
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out, self.hidden_tag, self.depth = [], None, 0
+
+    def handle_starttag(self, tag, attrs):
+        if self.hidden_tag:
+            self.depth += tag == self.hidden_tag
+            return
+        a = dict(attrs)
+        if tag not in _VOID and ("hidden" in a or _HIDING.search(a.get("style") or "")):
+            self.hidden_tag, self.depth = tag, 1
+            return
+        self.out.append(self.get_starttag_text())
+
+    def handle_endtag(self, tag):
+        if self.hidden_tag:
+            self.depth -= tag == self.hidden_tag
+            if self.depth == 0:
+                self.hidden_tag = None
+            return
+        self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        if not self.hidden_tag:
+            self.out.append(data)
+
+    handle_entityref = lambda self, name: self.handle_data(f"&{name};")
+    handle_charref = lambda self, name: self.handle_data(f"&#{name};")
+
+
+def _visible(s: str) -> str:
+    # ponytail: inline styles and the hidden attribute only; class-based CSS and white-on-white text still pass.
+    p = _VisibleHTML()
+    p.feed(s)
+    p.close()
+    return "".join(p.out)
 
 
 def _html_to_text(s: str) -> str:
     s = re.sub(r"(?is)<(script|style).*?</\1>", "", s)
-    # Text the reader can't see must not reach the model (hidden prompt injection).
-    # ponytail: regex stops at the first matching close tag, so nested same-name tags leak; use html.parser if that bites.
-    s = _HIDDEN.sub("", s)
+    s = _visible(s)
     s = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>", "\n", s)
     return html.unescape(re.sub(r"<[^>]+>", "", s))
 
