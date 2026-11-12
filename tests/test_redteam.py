@@ -110,3 +110,13 @@ def test_many_unclosed_openers_is_fast():
 def test_plaintext_cannot_close_hidden_ancestor():
     text = _html_to_text("<p>keep</p><div hidden><plaintext></div>secret")
     assert "secret" not in text and "keep" in text
+
+
+def test_units_and_case_handled():
+    for c in ['<span style="display:NONE !IMPORTANT">secret</span>', '<span style="font-size:5%">secret</span>',
+              '<span style="font-size:0.05em">secret</span>', '<title>a</titlex>secret</title>',
+              '<script>a</scriptx>secret</script>']:
+        assert "secret" not in _html_to_text("<p>keep</p>" + c), c
+    text = _html_to_text('<span style="font-size:1em">a1</span><span style="font-size:90%">a2</span>'
+                         '<span style="width:1in">a3</span><span style="font-size:12pt">a4</span>')
+    assert all(k in text for k in ("a1", "a2", "a3", "a4")), text

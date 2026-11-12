@@ -18,7 +18,10 @@ def _addrs(value: str | None) -> list[str]:
 _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 _INVISIBLE_TEXT = {"script", "style", "title", "iframe", "noembed", "noframes"}  # raw-text content the reader never sees
 _COMPUTED = re.compile(r"\b(calc|var|min|max|clamp|env|attr)\s*\(", re.I)
-_NUMBER = re.compile(r"^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(%?)", re.I)
+_NUMBER = re.compile(r"^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(%|[a-z]*)", re.I)
+# Largest size that still counts as unreadable, per unit (relative units are against ~16px).
+_TINY = {"%": 10, "em": 0.1, "rem": 0.1, "ex": 0.2, "ch": 0.2, "vw": 0.1, "vh": 0.1, "vmin": 0.1, "vmax": 0.1,
+         "in": 0.01, "cm": 0.03, "mm": 0.3, "pc": 0.06, "q": 1}
 _SIZE_PROPS = {"font-size", "height", "width", "max-height", "max-width", "line-height"}
 
 
@@ -32,7 +35,7 @@ def _css(value: str) -> str:
 def _style_hides(style: str) -> bool:
     for decl in _css(style).split(";"):
         prop, _, value = decl.partition(":")
-        prop, value = prop.strip().lower(), value.replace("!important", "").strip().lower()
+        prop, value = prop.strip().lower(), re.sub(r"!\s*important\s*$", "", value.strip().lower()).strip()
         if prop == "display" and value == "none" or prop == "visibility" and value in {"hidden", "collapse"}:
             return True
         if prop == "opacity" or prop in _SIZE_PROPS:
@@ -41,9 +44,12 @@ def _style_hides(style: str) -> bool:
             m = _NUMBER.match(value)
             if not m:
                 continue  # keywords like auto / 100% / normal
-            n = float(m.group(1)) / (100 if m.group(2) else 1)
-            # Near-invisible: opacity ≤ 0.05, sizes ≤ 1 (px/em/…) or ≤ 1%. Negatives count too.
-            if n <= (0.05 if prop == "opacity" else 0.01 if m.group(2) else 1):
+            n, unit = float(m.group(1)), m.group(2)
+            if prop == "opacity":
+                hidden = (n / 100 if unit == "%" else n) <= 0.05
+            else:  # ponytail: one element only; nested 50% inside 20% compounds past this check
+                hidden = n <= _TINY.get(unit, 1)  # px, pt, unitless: ≤ 1
+            if hidden:  # negatives count too
                 return True
     return False
 
