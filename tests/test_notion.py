@@ -70,7 +70,7 @@ def test_list_open_paginates_and_filters():
     tasks = NotionStore("t", "db1", http=http).list_open()
     assert len(tasks) == 2
     body = http.calls[0][2]
-    assert body["filter"] == {"property": "Status", "select": {"equals": "To do"}}
+    assert body["filter"] == {"or": [{"property": "Status", "select": {"equals": s}} for s in ("To do", "Review")]}
     assert body["sorts"] == [{"property": "Due", "direction": "ascending"}]
     assert http.calls[1][2]["start_cursor"] == "c2"
 
@@ -106,7 +106,7 @@ def test_setup_schema():
     assert set(props) == set(PROPERTY_NAMES)
     opts = lambda name: [o["name"] for o in props[name]["select"]["options"]]
     assert opts("Type") == ["Action", "Call", "Assignment", "Approval", "Follow-up", "Deadline", "Added"]
-    assert opts("Status") == ["To do", "Done", "Cancelled"]
+    assert opts("Status") == ["To do", "Review", "Done", "Cancelled"]
     assert opts("Platform") == ["Zoom", "Meet", "Teams", "Webex", "Phone", "Other"]
     assert opts("Priority") == ["P1", "P2", "P3", "P4"]
 

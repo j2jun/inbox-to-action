@@ -9,7 +9,7 @@ from inbox_to_action.pipeline import Config, process
 from inbox_to_action.store import MemoryStore
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ai"
-CONFIG = Config(user_email=USER, vips={"priya@acme.example", "dana.reyes@bigclient.example"}, tz=TZ)
+CONFIG = Config(user_email=USER, vips={"priya@acme.example", "dana.reyes@bigclient.example"}, tz=TZ, jira_sites={"acme"})
 STUB = make_stub_call(FIXTURES)
 
 

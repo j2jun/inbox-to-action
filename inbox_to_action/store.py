@@ -2,7 +2,7 @@
 import itertools
 from dataclasses import replace
 
-from .models import Task
+from .models import OPEN, Task
 
 
 class MemoryStore:
@@ -31,4 +31,4 @@ class MemoryStore:
         def sort_key(t):
             d = t.due
             return (d is None, str(d.date() if hasattr(d, "date") else d) if d else "", str(d) if d else "")
-        return sorted((replace(t) for t in self.pages.values() if t.status == "To do"), key=sort_key)
+        return sorted((replace(t) for t in self.pages.values() if t.status in OPEN), key=sort_key)

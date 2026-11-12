@@ -17,6 +17,9 @@ class Email:
     thread_id: str | None = None
 
 
+OPEN = ("To do", "Review")  # Review: suggested by AI from an outside sender, waiting for your OK
+
+
 @dataclass
 class Task:
     title: str

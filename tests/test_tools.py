@@ -16,7 +16,7 @@ TITLES = {
 @pytest.mark.parametrize("prefix", sorted(TITLES))
 def test_tool_tasks(load, prefix):
     want = expected(prefix)["tasks"][0]
-    tasks = detect_tool_task(load(prefix), NOW)
+    tasks = detect_tool_task(load(prefix), NOW, {"acme"})
     assert len(tasks) == 1
     t = tasks[0]
     assert t.title == TITLES[prefix]
@@ -41,4 +41,4 @@ def test_unknown_sender(load):
 def test_source_link_host_is_pinned(load, url):
     e = load("12")
     e.body = e.body.replace("https://acme.atlassian.net/browse/PLAT-2291", url)
-    assert detect_tool_task(e, NOW)[0].source_item is None
+    assert detect_tool_task(e, NOW, {"acme"})[0].source_item is None

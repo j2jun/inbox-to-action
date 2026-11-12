@@ -38,6 +38,7 @@ function nextWeekday(target) { // 0=Sun … 5=Fri; today counts if it matches
 }
 
 const SECTIONS = [
+  ["Needs your OK", (t) => t.status === "Review", "review"],
   ["Overdue", (t) => t.due !== null && dayDiff(t) < 0, "overdue"],
   ["Today", (t) => dayDiff(t) === 0],
   ["Tomorrow", (t) => dayDiff(t) === 1],
@@ -77,7 +78,7 @@ function render() {
   const flow = $("flow");
   flow.replaceChildren();
   for (const [name, match, cls] of SECTIONS) {
-    const list = tasks.filter(match).sort((a, b) =>
+    const list = tasks.filter((t) => t.status !== "Cancelled" && (cls === "review") === (t.status === "Review") && match(t)).sort((a, b) =>
       (dueDate(a) ?? Infinity) - (dueDate(b) ?? Infinity) || a.priority.localeCompare(b.priority));
     if (!list.length) continue;
     const sec = el("section", { class: `sec ${cls || ""}`, "aria-label": name },
@@ -99,6 +100,16 @@ function row(t) {
   if (when) meta.append(el("span", { class: "when", text: when }));
   meta.append(el("span", { text: t.type === "Call" ? (t.platform || "Call") : t.type }));
   if (t.from) meta.append(el("span", { class: t.vip ? "vip" : "", text: (t.vip ? "★ " : "") + t.from }));
+  if (t.status === "Review") {  // outside sender: show the real address so a lookalike name can't hide it
+    meta.append(el("span", { class: "addr", text: t.from_addr }));
+    const ok = el("button", { type: "button", class: "btn approve", text: "Approve" });
+    ok.addEventListener("click", () => change(t, { approve: true }, `Added: ${t.title}`));
+    const no = el("button", { type: "button", class: "btn dismiss", text: "Dismiss" });
+    no.addEventListener("click", () => change(t, { approve: false }, `Dismissed: ${t.title}`));
+    item.append(el("span", { class: "node", "aria-hidden": "true" }),
+      el("div", { class: "line" }, el("span", { class: "t", text: t.title })), meta, el("div", { class: "acts" }, ok, no));
+    return item;
+  }
 
   const acts = el("div", { class: "acts" });
   const join = safeLink(t.join_link), tel = safeTel(t.phone);
@@ -187,12 +198,15 @@ async function api(method, path, body) {
 function snapshot(t) { return { status: t.status, priority: t.priority, due: t.due, has_time: t.has_time }; }
 function applyLocal(t, patch) {
   if ("done" in patch) t.status = patch.done ? "Done" : "To do";
+  if ("approve" in patch) t.status = patch.approve ? "To do" : "Cancelled";
+  if ("review" in patch) t.status = "Review";
   if ("priority" in patch) t.priority = patch.priority;
   if ("due" in patch) { t.due = patch.due; t.has_time = false; }
 }
 function inverse(before, patch) {
   const inv = {};
   if ("done" in patch) inv.done = before.status === "Done";
+  if ("approve" in patch) inv.review = true;
   if ("priority" in patch) inv.priority = before.priority;
   if ("due" in patch) inv.due = before.due;
   return inv;

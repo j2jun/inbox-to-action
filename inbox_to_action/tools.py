@@ -33,7 +33,8 @@ def _docusign(e: Email) -> str:
 
 # sender: regex on the From address; when: extra condition; due: read a due date from the body
 TASK_TOOLS: list[dict] = [
-    {"name": "Jira", "sender": r"@[\w.-]*\.atlassian\.net$", "type": "Assignment", "title": _jira,
+    # Anyone can open a free *.atlassian.net site, so only sites listed in JIRA_SITES are trusted.
+    {"name": "Jira", "sender": r"@[\w.-]*\.atlassian\.net$", "type": "Assignment", "title": _jira, "site": True,
      "link": r"https://[\w-]+\.atlassian\.net/browse/[A-Z][A-Z0-9]+-\d+\b", "due": True},
     {"name": "Asana", "sender": r"@asana\.com$", "type": "Assignment",
      "title": lambda e: _after(r"assigned a task to you\s*\n+\s*([^\n]+)", e.body, e.subject),
@@ -56,7 +57,12 @@ TASK_TOOLS: list[dict] = [
 ]
 
 
-def detect_tool_task(email: Email, now: datetime) -> list[Task] | None:
+def _site(addr: str) -> str:
+    m = re.search(r"@(?:[\w-]+\.)*?([\w-]+)\.atlassian\.net$", addr, re.I)
+    return m.group(1).lower() if m else ""
+
+
+def detect_tool_task(email: Email, now: datetime, jira_sites: frozenset | set = frozenset()) -> list[Task] | None:
     # A forged From: (DKIM/SPF/DMARC fail) gets no task-tool trust; it goes through the normal pipeline instead.
     # ponytail: only .eml input carries Authentication-Results; Zapier payloads don't, so they rely on Gmail's spam filter.
     if re.search(r"\b(dkim|spf|dmarc)=fail\b", email.headers.get("authentication-results", ""), re.I):
@@ -66,6 +72,8 @@ def detect_tool_task(email: Email, now: datetime) -> list[Task] | None:
             continue
         if "when" in row and not row["when"](email):
             continue
+        if row.get("site") and _site(email.from_addr) not in jira_sites:
+            return None  # an unlisted site's mail goes through the normal pipeline (and lands in Review)
         # Links must start at a URL boundary so "https://evil.example/x.atlassian.net/..." can't match mid-string.
         link = re.search(r"(?<![\w./-])" + row["link"], email.body) if row["link"] else None
         due_line = _DUE_LINE.search(email.body) if row["due"] else None

@@ -5,14 +5,15 @@ from inbox_to_action.parse import _html_to_text
 from inbox_to_action.models import Email
 from conftest import NOW
 
-# Known residual risks: real-but-untrusted Atlassian sites, and plain-text injection
-# against a model that obeys everything. Both need human approval to close (see README).
-RESIDUAL = {"04_attacker_atlassian_site.eml", "07_visible_injection.eml"}
+# Plain-text injection can't be filtered out: against a model that obeys everything it still produces the
+# attacker's task, which is held in Review (Needs your OK) instead of landing on your list.
+HELD_FOR_REVIEW = {"07_visible_injection.eml"}
 
 
-def test_only_residual_attacks_get_through():
+def test_no_attack_reaches_the_active_list():
     results = redteam.run("redteam", out=lambda *_: None)
-    assert {name for name, hit in results.items() if hit} == RESIDUAL
+    assert not [n for n, r in results.items() if r == "BREACH"]
+    assert {n for n, r in results.items() if r == "review"} == HELD_FOR_REVIEW
 
 
 def test_real_meeting_hosts_still_detected():
@@ -120,3 +121,80 @@ def test_units_and_case_handled():
     text = _html_to_text('<span style="font-size:1em">a1</span><span style="font-size:90%">a2</span>'
                          '<span style="width:1in">a3</span><span style="font-size:12pt">a4</span>')
     assert all(k in text for k in ("a1", "a2", "a3", "a4")), text
+
+
+def test_real_newsletter_patterns_stay_visible():
+    html_in = """<html><head><style>
+      [hidden] { display: none }
+      .btn { background: #0b5fff; color: #ffffff; }
+      .muted { color: #999999; font-size: 12px; }
+      @media (prefers-color-scheme: dark) { .body { color: #ffffff !important; background: #111 } }
+      @media (max-width: 600px) { .desk { display: none } }
+    </style></head>
+    <body class="body"><p>k1 please review the Q3 plan by Friday</p>
+      <a class="btn" href="https://x.example">k2 Open the plan</a>
+      <p class="muted">k3 footer text</p>
+      <table bgcolor="#000000"><tr><td><font color="white">k4 white on black</font></td></tr></table>
+      <div style="font-size:0.9em"><span style="font-size:90%">k5 small print</span></div>
+    </body></html>"""
+    text = _html_to_text(html_in)
+    assert all(k in text for k in ("k1", "k2", "k3", "k4", "k5")), text
+
+
+def test_cascade_and_inheritance_tricks_hidden():
+    cases = [
+        '<style>.x { color: #fff !important }</style><span class="x" style="color:#000">secret</span>',  # !important beats inline
+        '<style>#y { font-size: 1px }</style><div id="y">secret</div>',
+        '<div style="background:black"><span style="color:#050505">secret</span></div>',               # black on black
+        '<span style="color:rgba(0,0,0,0)">secret</span>',
+        '<span style="transform:scale(0)">secret</span>',
+        '<span style="clip:rect(0,0,0,0);position:absolute">secret</span>',
+        '<span style="text-indent:-9999px">secret</span>',
+        '<p>keep</p><style>p.z{visibility:hidden}</style><p class="z">secret</p>',  # <style> after the element
+    ]
+    for c in cases:
+        text = _html_to_text("<p>keep</p>" + c)
+        assert "secret" not in text and "keep" in text, c
+
+
+def test_big_stylesheet_is_fast():
+    import time
+    start = time.perf_counter()
+    _html_to_text("<style>" + "a" * 200_000 + "{" * 5000 + "</style><p>x</p>")
+    _html_to_text("<style>" + ".c{color:red}" * 3000 + "</style>" + "<p class=c>x</p>" * 2000)
+    assert time.perf_counter() - start < 3
+
+
+def test_outside_sender_ai_tasks_wait_for_review(load):
+    from inbox_to_action.pipeline import Config, process
+    from inbox_to_action.store import MemoryStore
+    stub = lambda req: {"content": [{"type": "tool_use", "name": "record_tasks", "input": {"tasks": [
+        {"title": "Send the deck", "type": "Action", "due": None, "platform": None, "phone": None}]}}]}
+    config = Config("alex@acme.example", {"dana.reyes@bigclient.example"}, NOW.tzinfo)
+    status = lambda **kw: process(_email(**kw), MemoryStore(), NOW, config, stub).created[0].status
+    assert status(frm="priya@acme.example") == "To do"                 # same domain
+    assert status(frm="dana.reyes@bigclient.example") == "To do"       # VIP
+    assert status(frm="stranger@elsewhere.example") == "Review"        # outside sender
+    assert status(frm="priya@acme.example", auth="dkim=fail") == "Review"  # forged own-domain mail
+
+
+def _email(frm, auth=""):
+    return Email(f"<{frm}-{auth}@x>", "Deck", "", frm, ["alex@acme.example"], [], NOW,
+                 {"authentication-results": auth} if auth else {}, "Can you send the deck?", None)
+
+
+def test_unlisted_jira_site_is_not_trusted(load):
+    from inbox_to_action.tools import detect_tool_task
+    e = load("12")
+    assert detect_tool_task(e, NOW, {"acme"}) and detect_tool_task(e, NOW, set()) is None
+    e.from_addr = "jira@acme-payroll.atlassian.net"
+    assert detect_tool_task(e, NOW, {"acme"}) is None
+
+
+def test_review_round_trip_through_web_and_stores():
+    from inbox_to_action.store import MemoryStore
+    from inbox_to_action.models import Task
+    store = MemoryStore()
+    t = store.create(Task("Buy gift cards", "Action", status="Review"))
+    assert [x.title for x in store.list_open()] == ["Buy gift cards"]
+    assert store.update(t.page_id, status="Cancelled") and store.list_open() == []

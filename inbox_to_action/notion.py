@@ -12,14 +12,14 @@ import urllib.request
 from datetime import date, datetime
 from email.utils import parseaddr
 
-from .models import Task
+from .models import OPEN, Task
 
 API = "https://api.notion.com/v1"
 VERSION = "2022-06-28"
 OPTIONS = {
     "Priority": ["P1", "P2", "P3", "P4"],
     "Type": ["Action", "Call", "Assignment", "Approval", "Follow-up", "Deadline", "Added"],
-    "Status": ["To do", "Done", "Cancelled"],
+    "Status": ["To do", "Review", "Done", "Cancelled"],
     "Platform": ["Zoom", "Meet", "Teams", "Webex", "Phone", "Other"],
 }
 SCHEMA = {
@@ -178,7 +178,7 @@ class NotionStore:
         return page_to_task(self._req("PATCH", f"/pages/{page_id}", {"properties": props}))
 
     def list_open(self) -> list[Task]:
-        return self._query({"property": "Status", "select": {"equals": "To do"}}, sort=True)
+        return self._query({"or": [{"property": "Status", "select": {"equals": s}} for s in OPEN]}, sort=True)
 
     def get(self, page_id: str) -> Task:
         return page_to_task(self._req("GET", f"/pages/{page_id}"))

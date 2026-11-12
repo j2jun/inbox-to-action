@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .models import Task
+from .models import OPEN, Task
 
 API = "https://api.ticktick.com/open/v1"
 AUTH_URL = "https://ticktick.com/oauth/authorize"
@@ -86,7 +86,7 @@ def json_to_task(t: dict, tz: ZoneInfo) -> Task:
     if t.get("status", 0) == 2:
         status = "Cancelled" if status == "Cancelled" else "Done"
     else:
-        status = "To do"
+        status = "Review" if status == "Review" else "To do"
     return Task(title=t.get("title", ""), type=meta.pop("type", "Added"), due=due, status=status,
                 priority=FROM_TT.get(t.get("priority", 0), "P4"), page_id=t["id"], **meta)
 
@@ -136,7 +136,7 @@ class TickTickStore:
     def create(self, task: Task) -> Task:
         created = json_to_task(self._req("POST", "/task", task_to_json(replace(task, page_id=None), self.pid, self.tz)),
                                self.tz)
-        if task.status != "To do":
+        if task.status not in OPEN:
             self._req("POST", f"/project/{self.pid}/task/{created.page_id}/complete")
             created = replace(created, status=task.status)
         return created
@@ -148,10 +148,10 @@ class TickTickStore:
         current = self.get(page_id)
         task = replace(current, **fields)
         body = task_to_json(task, self.pid, self.tz)
-        if task.status == "To do" and current.status != "To do":
+        if task.status in OPEN and current.status not in OPEN:
             body["status"] = 0  # reopen (Undo on the Today page)
         self._req("POST", f"/task/{page_id}", body)
-        if task.status != "To do" and current.status == "To do":
+        if task.status not in OPEN and current.status in OPEN:
             self._req("POST", f"/project/{self.pid}/task/{page_id}/complete")
         return task
 

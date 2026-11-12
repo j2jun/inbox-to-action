@@ -36,7 +36,8 @@ def evaluate(samples: str, live: bool = False, out=print) -> dict:
     ctx, expected = spec["context"], spec["emails"]
     tz = ZoneInfo(ctx["timezone"])
     now = datetime.fromisoformat(ctx["now"]).astimezone(tz)
-    config = Config(user_email=ctx["user"].split("<")[-1].rstrip(">").lower(), vips=set(ctx["vip"]), tz=tz)
+    config = Config(user_email=ctx["user"].split("<")[-1].rstrip(">").lower(), vips=set(ctx["vip"]), tz=tz,
+                    jira_sites=set(ctx.get("jira_sites", [])))
     ai = anthropic_call if live else make_stub_call(FIXTURES)
     store = MemoryStore()
 

@@ -19,6 +19,7 @@ class Config:
     user_email: str
     vips: set[str]
     tz: ZoneInfo
+    jira_sites: set[str] = field(default_factory=set)
 
     @classmethod
     def from_env(cls, env=os.environ) -> "Config":
@@ -26,6 +27,7 @@ class Config:
             user_email=env.get("USER_EMAIL", "").lower(),
             vips={v.strip().lower() for v in env.get("VIP_EMAILS", "").split(",") if v.strip()},
             tz=ZoneInfo(env.get("TIMEZONE", "America/Los_Angeles")),
+            jira_sites={s.strip().lower() for s in env.get("JIRA_SITES", "").split(",") if s.strip()},
         )
 
 
@@ -47,6 +49,21 @@ def _finish(task: Task, email: Email, now: datetime, config: Config) -> Task:
     return replace(task, priority=level, reason=reason, snippet=snippet, source_email=link)
 
 
+def _trusted(email: Email, config: Config) -> bool:
+    """AI tasks go straight to your list only from VIPs or your own domain, and never from forged mail."""
+    if re.search(r"\b(dkim|spf|dmarc)=fail\b", email.headers.get("authentication-results", ""), re.I):
+        return False
+    sender = email.from_addr.lower()
+    domain = lambda a: a.rsplit("@", 1)[-1]
+    # ponytail: Zapier payloads carry no auth headers, so a spoofed same-domain From is trusted; Gmail's spam filter is the backstop
+    return sender in config.vips or bool(config.user_email) and domain(sender) == domain(config.user_email)
+
+
+def _for_review(tasks: list[Task], email: Email, config: Config) -> list[Task]:
+    # A model reading attacker text can be talked into anything, so outside senders' tasks wait for your OK.
+    return tasks if _trusted(email, config) else [replace(t, status="Review") for t in tasks]
+
+
 def _create_all(tasks: list[Task], email, store, now, config, out: Outcome) -> None:
     for i, t in enumerate(tasks):
         t = _finish(replace(t, key=t.key or f"{email.message_id}#{i}"), email, now, config)
@@ -62,7 +79,7 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
     out = Outcome()
 
     # Task-tool notifications first: they often carry List-Unsubscribe and must never be skipped.
-    tool_tasks = detect_tool_task(email, now)
+    tool_tasks = detect_tool_task(email, now, config.jira_sites)
     if tool_tasks is not None:
         if _seen(email, store):
             out.skipped = "already processed"
@@ -99,7 +116,7 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
             return out
         out.created.append(store.create(_finish(call, email, now, config)))
         # Invites can also ask for prep work ("bring your top 3 bets").
-        prep = [t for t in extract_with_ai(email, now, ai_call) if t.type != "Call"]
+        prep = _for_review([t for t in extract_with_ai(email, now, ai_call) if t.type != "Call"], email, config)
         _create_all([replace(t, key=f"{email.message_id}#{i + 1}") for i, t in enumerate(prep)],
                     email, store, now, config, out)
         return out
@@ -107,7 +124,7 @@ def process(email: Email, store, now: datetime, config: Config, ai_call) -> Outc
     if _seen(email, store):
         out.skipped = "already processed"
         return out
-    tasks = extract_with_ai(email, now, ai_call)
+    tasks = _for_review(extract_with_ai(email, now, ai_call), email, config)
     if not tasks:
         out.skipped = "no task found"
         return out

@@ -80,7 +80,7 @@ def test_list_tasks_json(app):
     hdr, _ = login(app)
     t = call(app, "GET", "/api/tasks", headers=hdr)["json"]["tasks"][0]
     assert set(t) == {"id", "title", "type", "priority", "reason", "due", "has_time", "platform", "join_link",
-                      "phone", "from", "vip", "status"}
+                      "phone", "from", "from_addr", "vip", "status"}
     assert t["vip"] is True
 
 
@@ -196,3 +196,13 @@ def test_unconfigured_production_app_answers_503(monkeypatch):
     monkeypatch.setattr(web, "_app", None)
     r = call(web.app, "GET", "/api/tasks")
     assert r["status"] == 503 and r["json"] == {"error": "not configured"}
+
+
+def test_approve_dismiss_and_undo_review(app, store):
+    hdr, _ = login(app)
+    t = store.create(Task("Buy gift cards", "Action", status="Review"))
+    assert any(x["id"] == t.page_id for x in call(app, "GET", "/api/tasks", headers=hdr)["json"]["tasks"])
+    for body, want in [({"approve": True}, "To do"), ({"review": True}, "Review"), ({"approve": False}, "Cancelled")]:
+        r = call(app, "PATCH", f"/api/tasks/{t.page_id}", body, headers=hdr)
+        assert r["status"] == 200 and r["json"]["status"] == want, body
+    assert call(app, "PATCH", f"/api/tasks/{t.page_id}", {"approve": "yes"}, headers=hdr)["status"] == 400

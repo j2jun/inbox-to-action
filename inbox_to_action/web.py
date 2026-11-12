@@ -31,7 +31,8 @@ def _task_json(t: Task, vips: set[str]) -> dict:
     return {
         "id": t.page_id, "title": t.title, "type": t.type, "priority": t.priority, "reason": t.reason,
         "due": due, "has_time": isinstance(t.due, datetime), "platform": t.platform, "join_link": t.join_link,
-        "phone": t.phone, "from": t.from_name or t.from_addr, "vip": t.from_addr.lower() in vips, "status": t.status,
+        "phone": t.phone, "from": t.from_name or t.from_addr, "from_addr": t.from_addr,
+        "vip": t.from_addr.lower() in vips, "status": t.status,
     }
 
 
@@ -112,6 +113,12 @@ def make_app(store, config: Config, ai_call, now_fn=None, env=os.environ):
             if not isinstance(data["done"], bool):
                 raise HTTPError(400, "bad done")
             fields["status"] = "Done" if data["done"] else "To do"
+        if "approve" in data:  # a Review suggestion: True puts it on your list, False dismisses it
+            if not isinstance(data["approve"], bool):
+                raise HTTPError(400, "bad approve")
+            fields["status"] = "To do" if data["approve"] else "Cancelled"
+        if data.get("review") is True:  # Undo of approve/dismiss
+            fields["status"] = "Review"
         if "priority" in data:
             if data["priority"] not in PRIORITIES:
                 raise HTTPError(400, "bad priority")

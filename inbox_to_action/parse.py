@@ -3,114 +3,16 @@ import email
 import email.policy
 import hashlib
 import html
-from html.parser import HTMLParser
 import re
 from datetime import datetime, timezone
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 
 from .models import Email
+from .visible import visible as _visible
 
 
 def _addrs(value: str | None) -> list[str]:
     return [a.lower() for _, a in getaddresses([value or ""]) if a]
-
-
-_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
-_INVISIBLE_TEXT = {"script", "style", "title", "iframe", "noembed", "noframes"}  # raw-text content the reader never sees
-_COMPUTED = re.compile(r"\b(calc|var|min|max|clamp|env|attr)\s*\(", re.I)
-_NUMBER = re.compile(r"^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(%|[a-z]*)", re.I)
-# Largest size that still counts as unreadable, per unit (relative units are against ~16px).
-_TINY = {"%": 10, "em": 0.1, "rem": 0.1, "ex": 0.2, "ch": 0.2, "vw": 0.1, "vh": 0.1, "vmin": 0.1, "vmax": 0.1,
-         "in": 0.01, "cm": 0.03, "mm": 0.3, "pc": 0.06, "q": 1}
-_SIZE_PROPS = {"font-size", "height", "width", "max-height", "max-width", "line-height"}
-
-
-def _css(value: str) -> str:
-    """Undo CSS comments and escapes so "displ\\61y:/**/none" reads as "display:none"."""
-    value = re.sub(r"(?s)/\*.*?\*/", "", value)
-    value = re.sub(r"\\([0-9a-fA-F]{1,6})\s?", lambda m: chr(min(int(m.group(1), 16), 0x10FFFF)), value)
-    return re.sub(r"\\(.)", r"\1", value)
-
-
-def _style_hides(style: str) -> bool:
-    for decl in _css(style).split(";"):
-        prop, _, value = decl.partition(":")
-        prop, value = prop.strip().lower(), re.sub(r"!\s*important\s*$", "", value.strip().lower()).strip()
-        if prop == "display" and value == "none" or prop == "visibility" and value in {"hidden", "collapse"}:
-            return True
-        if prop == "opacity" or prop in _SIZE_PROPS:
-            if _COMPUTED.search(value):
-                return True  # can't evaluate calc()/var(): fail closed
-            m = _NUMBER.match(value)
-            if not m:
-                continue  # keywords like auto / 100% / normal
-            n, unit = float(m.group(1)), m.group(2)
-            if prop == "opacity":
-                hidden = (n / 100 if unit == "%" else n) <= 0.05
-            else:  # ponytail: one element only; nested 50% inside 20% compounds past this check
-                hidden = n <= _TINY.get(unit, 1)  # px, pt, unitless: ≤ 1
-            if hidden:  # negatives count too
-                return True
-    return False
-
-
-def _hides(tag: str, attrs: list) -> bool:
-    # Every occurrence counts: a duplicate style= must not let one copy slip past the check.
-    return tag not in _VOID and any(n == "hidden" or (n == "style" and _style_hides(v or "")) for n, v in attrs)
-
-
-class _VisibleHTML(HTMLParser):
-    """Rebuilds the HTML without subtrees the reader can't see, so hidden text never reaches the model."""
-    # Raw-text elements as browsers parse them ("</div>" inside a textarea closes nothing). Set explicitly
-    # because Python 3.12's default list lacks textarea/title.
-    CDATA_CONTENT_ELEMENTS = ("script", "style", "xmp", "iframe", "noembed", "noframes", "textarea", "title")
-
-    def __init__(self):
-        super().__init__(convert_charrefs=False)
-        self.out, self.hidden_tag, self.depth, self.raw = [], None, 0, None
-
-    def handle_starttag(self, tag, attrs):
-        if tag in _INVISIBLE_TEXT:
-            self.raw = tag
-        if self.hidden_tag:
-            self.depth += tag == self.hidden_tag
-            return
-        if _hides(tag, attrs):
-            self.hidden_tag, self.depth = tag, 1
-            return
-        self.out.append(self.get_starttag_text())
-
-    # Browsers ignore the "/" in "<div hidden/>": the element stays open, so treat it as a plain start tag.
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-
-    def handle_endtag(self, tag):
-        if tag == self.raw:
-            self.raw = None
-        if self.hidden_tag:
-            self.depth -= tag == self.hidden_tag
-            if self.depth == 0:
-                self.hidden_tag = None
-            return
-        self.out.append(f"</{tag}>")
-
-    def handle_data(self, data):
-        if not self.hidden_tag and not self.raw:
-            self.out.append(data)
-
-    handle_entityref = lambda self, name: self.handle_data(f"&{name};")
-    handle_charref = lambda self, name: self.handle_data(f"&#{name};")
-
-
-def _visible(s: str) -> str:
-    # ponytail: inline styles and the hidden attribute only; class-based CSS and white-on-white text still pass.
-    # Everything after <plaintext> is raw text to a browser (no tag ever closes again), so a later "</div>"
-    # can't end a hidden ancestor. Obsolete tag: drop the rest rather than model it.
-    s = re.split(r"(?i)<plaintext\b", s, maxsplit=1)[0]
-    p = _VisibleHTML()
-    p.feed(s)
-    # No close(): it would flush an unfinished trailing tag ("<div style=...secret") as visible text.
-    return "".join(p.out)
 
 
 def _html_to_text(s: str) -> str:
