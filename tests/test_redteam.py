@@ -77,3 +77,31 @@ def test_wrapper_escape_is_linear(load):
     e.body = "<em" * 50_000 + "<email>"
     content = build_request(e, NOW)["messages"][0]["content"]
     assert content.count("<email>") == 1 and len(content) <= 4000
+
+
+def test_numeric_and_attribute_tricks_closed():
+    cases = [
+        '<p>keep</p><span style="opacity:-1">secret</span>',
+        '<p>keep</p><span style="opacity:1e-9">secret</span>',
+        '<p>keep</p><span style="opacity:.001 !important">secret</span>',
+        '<p>keep</p><span style="font-size:calc(0px)">secret</span>',
+        '<p>keep</p><span style="font-size:0.5px">secret</span>',
+        '<p>keep</p><div style="display:none" title="<textarea>">secret</div><p>x</p></textarea>',
+    ]
+    for c in cases:
+        text = _html_to_text(c)
+        assert "secret" not in text and "keep" in text, c
+
+
+def test_normal_styles_and_textarea_text_visible():
+    text = _html_to_text('<div style="width:100%;height:auto;font-size:14px;opacity:0.9">keep1</div>'
+                         '<textarea>keep2 </div> keep3</textarea><script>nope</script><title>nope</title>')
+    assert all(k in text for k in ("keep1", "keep2", "keep3")) and "nope" not in text
+
+
+def test_many_unclosed_openers_is_fast():
+    import time
+    start = time.perf_counter()
+    _html_to_text("<textarea " * 20_000 + "<p>x</p>")
+    _html_to_text("<title>" * 20_000)
+    assert time.perf_counter() - start < 2
