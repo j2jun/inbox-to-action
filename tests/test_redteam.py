@@ -270,3 +270,18 @@ def test_review_round_eight_bypasses_closed():
         assert "secret" not in text and "keep" in text, c
     shown = _html_to_text('<div style="zoom:0.9">k1</div><span style="font: oblique 10deg 14px Arial">k2</span>')
     assert "k1" in shown and "k2" in shown, shown
+
+
+def test_auth_results_tokenizer_edge_cases():
+    from inbox_to_action.pipeline import auth_results
+    good = "mx.google.com; dkim=pass header.d=acme.example; dmarc=pass (p=NONE) header.from=acme.example"
+    assert [(m, r) for m, r, _ in auth_results(good)] == [("dkim", "pass"), ("dmarc", "pass")]
+    nested = "mx.google.com; dkim=fail " + "(" * 8 + "x" + ")" * 8 + " ; spf=none"
+    assert [(m, r) for m, r, _ in auth_results(nested)] == [("dkim", "fail"), ("spf", "none")]
+    deep_hide = "mx.google.com; spf=none " + "(" * 7 + ") ; dmarc=pass header.from=acme.example" + ")" * 7
+    assert all(m != "dmarc" for m, _, _ in auth_results(deep_hide))              # still inside a comment
+    quoted = 'mx.google.com; spf=pass smtp.mailfrom="x;dmarc=pass header.from=acme.example"@evil.example'
+    assert all(m != "dmarc" for m, _, _ in auth_results(quoted))
+    assert auth_results("mx.google.com; dmarc=pass header.from=acme.example (unclosed") == []
+    assert auth_results('mx.google.com; dmarc=pass header.from="acme.example') == []
+    assert auth_results("attacker.example; dmarc=pass header.from=acme.example") == []  # not Gmail's verdict

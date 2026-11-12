@@ -69,20 +69,61 @@ def _trusted(email: Email, config: Config) -> bool:
                for method, result, props in auth_results(auth))
 
 
+AUTHSERV_IDS = {"mx.google.com"}  # whose Authentication-Results count: the receiving server (Gmail)
+
+
 def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
     """'mx.google.com; dkim=pass (ok) header.d=acme.example; dmarc=fail' → [(method, result, {prop: value})].
 
-    Comments are removed first, and each check's own result is read, so "dmarc=pass" text inside a comment
-    or another field can't count as a pass. The first segment (the authserv-id) is skipped.
+    Tokenized character by character (RFC 8601): comments may nest to any depth and are dropped, quoted strings
+    are kept as one word with their '=' and ';' neutralized, and ';' only splits outside both. An unterminated
+    quote or comment, or results from a server other than AUTHSERV_IDS, returns [] (fail closed).
     """
-    for _ in range(5):  # comments can nest; strip innermost first
-        header = re.sub(r"\([^()]*\)", " ", header)
+    segments, current, depth, quoted, escaped = [], [], 0, False, False
+    for ch in header:
+        if escaped:
+            escaped = False
+            if quoted and depth == 0:
+                current.append(ch if ch.isalnum() or ch in ".@_-" else "_")
+            continue
+        if ch == "\\" and (quoted or depth):
+            escaped = True
+        elif quoted:
+            if ch == '"':
+                quoted = False
+                current.append('"')
+            elif depth == 0:
+                current.append(ch if ch.isalnum() or ch in ".@_-" else "_")  # no '=', ';' or spaces survive
+        elif ch == "(":
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+        elif depth:
+            continue
+        elif ch == '"':
+            quoted = True
+            current.append('"')
+        elif ch == ";":
+            segments.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    if quoted or depth or escaped:
+        return []
+    segments.append("".join(current))
+    authserv = segments[0].split()
+    if not authserv or authserv[0].lower() not in AUTHSERV_IDS:
+        return []
     results = []
-    for segment in header.split(";")[1:]:
-        m = re.match(r"\s*([\w-]+)\s*=\s*([\w-]+)(.*)$", segment, re.S)
-        if m:
-            props = {k.lower(): v.strip('"').lower() for k, v in re.findall(r"([\w.-]+)\s*=\s*(\"[^\"]*\"|[^\s;]+)", m.group(3))}
-            results.append((m.group(1).lower(), m.group(2).lower(), props))
+    for segment in segments[1:]:
+        words = segment.split()
+        if not words or not (m := re.fullmatch(r"([\w-]+)=([\w-]+)", words[0])):
+            continue
+        props = {}
+        for w in words[1:]:
+            if pm := re.fullmatch(r"([\w.-]+)=\"?([\w.@-]+)\"?", w):
+                props[pm.group(1).lower()] = pm.group(2).lower()
+        results.append((m.group(1).lower(), m.group(2).lower(), props))
     return results
 
 
