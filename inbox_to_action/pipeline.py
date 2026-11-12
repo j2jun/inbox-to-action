@@ -63,8 +63,27 @@ def _trusted(email: Email, config: Config) -> bool:
         # there; Gmail's spam filter is the backstop. Pass the header through Zapier to close this.
         return True
     # Header present: require a positive pass aligned with the sender's domain, not merely "no fail".
-    aligned_dkim = re.search(r"\bdkim=pass\b[^;]*header\.d=(?:[\w-]+\.)*" + re.escape(domain) + r"\b", auth, re.I)
-    return bool(re.search(r"\bdmarc=pass\b", auth, re.I) or aligned_dkim)
+    aligned = lambda d: "." in d and (d == domain or domain.endswith("." + d) or d.endswith("." + domain))
+    return any(method == "dmarc" and result == "pass" and props.get("header.from") == domain
+               or method == "dkim" and result == "pass" and aligned(props.get("header.d", ""))
+               for method, result, props in auth_results(auth))
+
+
+def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
+    """'mx.google.com; dkim=pass (ok) header.d=acme.example; dmarc=fail' → [(method, result, {prop: value})].
+
+    Comments are removed first, and each check's own result is read, so "dmarc=pass" text inside a comment
+    or another field can't count as a pass. The first segment (the authserv-id) is skipped.
+    """
+    for _ in range(5):  # comments can nest; strip innermost first
+        header = re.sub(r"\([^()]*\)", " ", header)
+    results = []
+    for segment in header.split(";")[1:]:
+        m = re.match(r"\s*([\w-]+)\s*=\s*([\w-]+)(.*)$", segment, re.S)
+        if m:
+            props = {k.lower(): v.strip('"').lower() for k, v in re.findall(r"([\w.-]+)\s*=\s*(\"[^\"]*\"|[^\s;]+)", m.group(3))}
+            results.append((m.group(1).lower(), m.group(2).lower(), props))
+    return results
 
 
 def _for_review(tasks: list[Task], email: Email, config: Config) -> list[Task]:

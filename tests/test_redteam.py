@@ -239,3 +239,17 @@ def test_deep_nesting_and_unmatched_end_tags_are_fast_and_fail_closed():
     assert "secret" not in text and "keep" in text
     _html_to_text("<b>x</b>" * 30_000)
     assert time.perf_counter() - start < 2
+
+
+def test_auth_results_parsed_not_pattern_matched():
+    from inbox_to_action.pipeline import Config, _trusted
+    config = Config("alex@acme.example", set(), NOW.tzinfo, trusted_domains={"acme.example"})
+    ok = lambda auth: _trusted(_email(frm="priya@acme.example", auth=auth), config)
+    assert ok("mx.google.com; dmarc=pass (p=NONE) header.from=acme.example")
+    assert ok("mx.google.com; dkim=pass header.i=@acme.example header.s=s1 header.d=acme.example")
+    assert ok("mx.google.com; dkim=pass header.d=mail.acme.example")                        # subdomain signer
+    assert not ok("mx.google.com; dkim=pass header.d=acme.example.evil.example")            # suffix trick
+    assert not ok("mx.google.com; dkim=fail (dmarc=pass header.from=acme.example)")         # pass only in a comment
+    assert not ok('mx.google.com; spf=pass smtp.mailfrom="dmarc=pass"@evil.example')       # pass inside another field
+    assert not ok("mx.google.com; dmarc=pass header.from=evil.example")                     # someone else's DMARC
+    assert not ok("mx.google.com; dmarc=fail header.from=acme.example")
