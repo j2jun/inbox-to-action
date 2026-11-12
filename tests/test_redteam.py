@@ -52,3 +52,28 @@ def test_nested_and_attribute_hidden_html_dropped():
                '<span hidden>secret2<br>x</span><b>also &amp; keep</b>')
     text = _html_to_text(html_in)
     assert "secret" not in text and "keep" in text and "also & keep" in text
+
+
+def test_hidden_html_parser_differentials_closed():
+    cases = [
+        '<p>keep</p><div hidden/>secret',                                   # browsers ignore the "/"
+        '<p>keep</p><span style="color:red" style="display:none">secret</span>',  # duplicate attribute
+        '<p>keep</p><span style="displ\\61y:/**/none">secret</span>',       # CSS escape + comment
+        '<p>keep</p><div style="display:none"><textarea></div></textarea>secret</div>',  # raw-text element
+        '<p>keep</p><div style="display:none" secret',                      # unterminated tag
+        '<p>keep</p><span style="opacity:0%">secret</span>',
+    ]
+    for c in cases:
+        text = _html_to_text(c)
+        assert "secret" not in text and "keep" in text, c
+
+
+def test_plain_trailing_text_kept():
+    assert _html_to_text("<p>hi</p>bye &amp; thanks").strip().endswith("bye & thanks")
+
+
+def test_wrapper_escape_is_linear(load):
+    e = load("11")
+    e.body = "<em" * 50_000 + "<email>"
+    content = build_request(e, NOW)["messages"][0]["content"]
+    assert content.count("<email>") == 1 and len(content) <= 4000

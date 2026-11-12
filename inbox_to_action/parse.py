@@ -15,9 +15,23 @@ def _addrs(value: str | None) -> list[str]:
     return [a.lower() for _, a in getaddresses([value or ""]) if a]
 
 
-_HIDING = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0(\.0*)?\s*(;|$)"
+_HIDING = re.compile(r"display\s*:\s*none|visibility\s*:\s*(hidden|collapse)|font-size\s*:\s*0|opacity\s*:\s*[0.]+\s*%?\s*(;|!|$)"
                      r"|max-height\s*:\s*0|(?<![\w-])(height|width)\s*:\s*0", re.I)
 _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+# Elements whose content browsers read as raw text (so "</div>" inside doesn't close anything); dropped whole.
+_RAW = re.compile(r"(?is)<(script|style|textarea|title|xmp|noembed|noframes|noscript|iframe)\b.*?</\1\s*>|<plaintext\b.*")
+
+
+def _css(value: str) -> str:
+    """Undo CSS comments and escapes so "displ\\61y:/**/none" reads as "display:none"."""
+    value = re.sub(r"(?s)/\*.*?\*/", "", value)
+    value = re.sub(r"\\([0-9a-fA-F]{1,6})\s?", lambda m: chr(min(int(m.group(1), 16), 0x10FFFF)), value)
+    return re.sub(r"\\(.)", r"\1", value)
+
+
+def _hides(tag: str, attrs: list) -> bool:
+    # Every occurrence counts: a duplicate style= must not let one copy slip past the check.
+    return tag not in _VOID and any(n == "hidden" or (n == "style" and _HIDING.search(_css(v or ""))) for n, v in attrs)
 
 
 class _VisibleHTML(HTMLParser):
@@ -30,11 +44,14 @@ class _VisibleHTML(HTMLParser):
         if self.hidden_tag:
             self.depth += tag == self.hidden_tag
             return
-        a = dict(attrs)
-        if tag not in _VOID and ("hidden" in a or _HIDING.search(a.get("style") or "")):
+        if _hides(tag, attrs):
             self.hidden_tag, self.depth = tag, 1
             return
         self.out.append(self.get_starttag_text())
+
+    # Browsers ignore the "/" in "<div hidden/>": the element stays open, so treat it as a plain start tag.
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
 
     def handle_endtag(self, tag):
         if self.hidden_tag:
@@ -56,12 +73,12 @@ def _visible(s: str) -> str:
     # ponytail: inline styles and the hidden attribute only; class-based CSS and white-on-white text still pass.
     p = _VisibleHTML()
     p.feed(s)
-    p.close()
+    # No close(): it would flush an unfinished trailing tag ("<div style=...secret") as visible text.
     return "".join(p.out)
 
 
 def _html_to_text(s: str) -> str:
-    s = re.sub(r"(?is)<(script|style).*?</\1>", "", s)
+    s = _RAW.sub("", s)
     s = _visible(s)
     s = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>", "\n", s)
     return html.unescape(re.sub(r"<[^>]+>", "", s))
