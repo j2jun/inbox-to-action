@@ -225,4 +225,6 @@ Offline, AI attacks run against an **obedient model** that follows any planted i
 
 **Attack success rate: 8/10 (80%) → 2/10 (20%).** `tests/test_redteam.py` fails if a blocked attack gets through again.
 
+**Known gaps in the hidden-text filter** (accepted; it's defense in depth, not the fix): text hidden by CSS classes or `<style>` rules, white-on-white or off-screen text, and font sizes that shrink across nested elements. Five rounds of automated security review each found new bypasses, which is the point: email-side filtering can't match what a browser shows.
+
 What's left is the reason the planned agent step stays **suggest → approve → execute**: no defense on the email side can reliably tell a real request from a convincing fake one.
