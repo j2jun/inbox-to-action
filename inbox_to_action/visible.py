@@ -29,7 +29,7 @@ _REL = {"em": 1, "%": 0.01, "ex": 0.5, "ch": 0.5}  # × the parent's font size
 _FONT_WORDS = {"xx-small": 9, "x-small": 10, "small": 13, "medium": 16, "large": 18, "x-large": 24,
                "xx-large": 32, "xxx-large": 48}
 _BOX_PROPS = {"height", "width", "max-height", "max-width", "line-height"}
-_STYLE_PROPS = {"font-size", "font", "color", "-webkit-text-fill-color", "background", "background-color"}
+_STYLE_PROPS = {"font-size", "font", "zoom", "color", "-webkit-text-fill-color", "background", "background-color"}
 MAX_DEPTH, MAX_ELEMENTS = 512, 20_000  # past either, the rest of the email is dropped (fail closed)
 _INTERACTIVE = re.compile(r":(hover|focus|focus-within|focus-visible|active|visited|target|checked)\b", re.I)
 _FAINT = (0, 0, 0, 0.0)  # a color we can't read is treated as invisible
@@ -89,15 +89,16 @@ def _color(value: str) -> tuple[float, float, float, float] | None:
             return None
         return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16) / 255 if len(h) == 8 else 1.0)
     if m := re.fullmatch(r"rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)(?:[\s,/]+([\d.]+%?))?\s*\)", v):
-        ch = [float(x[:-1]) * 2.55 if x.endswith("%") else float(x) for x in m.groups()[:3]]
+        ch = [min(255.0, float(x[:-1]) * 2.55 if x.endswith("%") else float(x)) for x in m.groups()[:3]]
         a = m.group(4)
         alpha = 1.0 if a is None else float(a[:-1]) / 100 if a.endswith("%") else float(a)
-        return (*ch, alpha)
+        return (*ch, min(1.0, alpha))
     if m := re.fullmatch(r"hsla?\(\s*([-\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%(?:[\s,/]+([\d.]+%?))?\s*\)", v):
-        h, sat, light = float(m.group(1)) % 360 / 360, float(m.group(2)) / 100, float(m.group(3)) / 100
+        clamp = lambda x: max(0.0, min(1.0, x))  # browsers clamp out-of-range values; so must we
+        h, sat, light = float(m.group(1)) % 360 / 360, clamp(float(m.group(2)) / 100), clamp(float(m.group(3)) / 100)
         r, g, b = colorsys.hls_to_rgb(h, light, sat)
         a = m.group(4)
-        return (r * 255, g * 255, b * 255, 1.0 if a is None else float(a[:-1]) / 100 if a.endswith("%") else float(a))
+        return (r * 255, g * 255, b * 255, clamp(1.0 if a is None else float(a[:-1]) / 100 if a.endswith("%") else float(a)))
     if "(" in v:
         return _FAINT  # lab(), oklch(), color(), …: can't check contrast, fail closed
     return None  # unknown names, currentcolor, inherit: caller keeps the inherited color
@@ -135,6 +136,8 @@ def _hides(prop: str, value: str) -> bool:
         if _COMPUTED.search(value):
             return True
     if prop == "zoom":
+        if _COMPUTED.search(value):
+            return True
         m = _NUMBER.match(value)
         return bool(m) and float(m.group(1)) / (100 if m.group(2) == "%" else 1) <= 0.05
     if prop == "opacity":
@@ -204,7 +207,9 @@ def _rules(css: str) -> list[_Rule]:
 def _rule(selector: str, body: str, order: int, alt_scheme: bool = False) -> _Rule | None:
     selector = selector.strip()
     last = re.split(r"\s*[>+~]\s*|\s+", selector)[-1] if selector else ""
-    if not last or "::" in last or _INTERACTIVE.search(last):  # pseudo-elements; rules that need hover/focus
+    last = re.sub(r"::?(first-line|first-letter)\b", "", last, flags=re.I)  # styles the element's own text
+    outside_not = re.sub(r":not\([^)]*\)", "", last, flags=re.I)  # ":not(:hover)" always applies
+    if not last or "::" in last or _INTERACTIVE.search(outside_not):  # other pseudo-elements; hover/focus-only rules
         return None
     last = re.sub(r":[\w-]+(\([^)]*\))?", "", last)  # :first-child, :not(…), …: apply anyway (fail closed)
     if not last:
@@ -300,7 +305,9 @@ class _Visible(HTMLParser):
                         font = _FONT_WORDS[size]
                         break
                     m = _NUMBER.match(size)
-                    if m and (m.group(2) or float(m.group(1)) == 0 or "/" in tok):  # 700 is a weight, 12px a size
+                    unit = m.group(2).lower() if m else ""
+                    is_length = unit in _PX or unit in _REL or unit == "rem"
+                    if m and is_length and (unit or float(m.group(1)) == 0 or "/" in tok):  # 700 is a weight, 10deg an angle
                         font = _length(size, parent.font) if m.group(2) != "rem" else float(m.group(1)) * BASE_FONT_PX
                         font = font if font is not None else parent.font
                         break
@@ -308,6 +315,9 @@ class _Visible(HTMLParser):
                 color = c
             elif prop in {"background", "background-color"} and (c := _first_color(value)) and c[3] > 0:
                 bg = c
+        for prop, value, _ in decls:  # zoom scales everything inside, so it compounds into the effective size
+            if prop == "zoom" and (m := _NUMBER.match(value)) and m.group(2) in ("", "%"):
+                font *= float(m.group(1)) / (100 if m.group(2) == "%" else 1)
         faint = font < MIN_FONT_PX or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
         if tag not in VOID:
             self.stack.append(_State(tag, hidden, faint, font, color, bg))

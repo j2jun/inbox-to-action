@@ -253,3 +253,20 @@ def test_auth_results_parsed_not_pattern_matched():
     assert not ok('mx.google.com; spf=pass smtp.mailfrom="dmarc=pass"@evil.example')       # pass inside another field
     assert not ok("mx.google.com; dmarc=pass header.from=evil.example")                     # someone else's DMARC
     assert not ok("mx.google.com; dmarc=fail header.from=acme.example")
+
+
+def test_review_round_eight_bypasses_closed():
+    cases = [
+        '<span style="color:hsl(0, 0%, 500%)">secret</span>',            # out-of-range lightness = white
+        '<span style="color:rgb(900, 900, 900)">secret</span>',
+        '<style>.x:not(:hover){display:none}</style><span class="x">secret</span>',
+        '<style>.x::first-line{color:#fff}</style><span class="x">secret</span>',
+        '<span style="zoom:calc(0)">secret</span>',
+        '<div style="zoom:0.3"><span style="zoom:0.3">secret</span></div>',  # 16 × .3 × .3 = 1.4px
+        '<span style="font: oblique 10deg 0/0 a">secret</span>',
+    ]
+    for c in cases:
+        text = _html_to_text("<span>keep</span>" + c)
+        assert "secret" not in text and "keep" in text, c
+    shown = _html_to_text('<div style="zoom:0.9">k1</div><span style="font: oblique 10deg 14px Arial">k2</span>')
+    assert "k1" in shown and "k2" in shown, shown
