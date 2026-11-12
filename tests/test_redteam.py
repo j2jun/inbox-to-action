@@ -315,3 +315,19 @@ def test_auth_results_injection_via_quoted_mailfrom_in_comment():
             "       spf=pass (google.com: domain of priya@acme.example designates 1.2.3.4 as permitted sender) "
             "smtp.mailfrom=priya@acme.example;\r\n       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=acme.example")
     assert [m for m, r, _ in auth_results(real) if r == "pass"] == ["dkim", "arc", "spf", "dmarc"]
+
+
+def test_review_round_ten_bypasses_closed():
+    import time
+    cases = [
+        '<style>.x:is(:hover{display:none}</style><span class="x">secret</span>',      # unbalanced: applies
+        '<span style="zoom:1e999">secret</span>',
+        '<div style="zoom:1e999"><span style="zoom:0">secret</span></div>',
+        '<span style="font-size:1e999px">secret</span>',
+    ]
+    for c in cases:
+        text = _html_to_text("<span>keep</span>" + c)
+        assert "secret" not in text and "keep" in text, c
+    start = time.perf_counter()
+    _html_to_text("<style>.x" + ":is(" * 20_000 + ")" * 20_000 + "{color:red}</style><p>x</p>")
+    assert time.perf_counter() - start < 1

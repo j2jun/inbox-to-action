@@ -11,6 +11,7 @@ When a rule can't be evaluated (calc(), var()) it fails closed. Known limits: sp
 pseudo-classes (:hover, :nth-child) are ignored, images and background-images aren't seen.
 """
 import colorsys
+import math
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -208,12 +209,15 @@ def _rule(selector: str, body: str, order: int, alt_scheme: bool = False) -> _Ru
     selector = selector.strip()
     last = re.split(r"\s*[>+~]\s*|\s+", selector)[-1] if selector else ""
     last = re.sub(r"::?(first-line|first-letter)\b", "", last, flags=re.I)  # styles the element's own text
-    top_level = last  # drop :not()/:is()/:where()/:has() groups (innermost first): a :hover inside them
-    for _ in range(len(last)):  # doesn't make the rule hover-only, so the rule still applies
-        stripped = re.sub(r":[\w-]+\([^()]*\)", "", top_level)
-        if stripped == top_level:
-            break
-        top_level = stripped
+    # Keep only top-level text: a :hover inside :not()/:is()/:where()/:has() doesn't make the rule hover-only.
+    # One linear pass; unbalanced parentheses mean we can't tell, so the rule applies (fail closed).
+    top, depth = [], 0
+    for ch in last:
+        depth += ch == "("
+        if depth == 0:
+            top.append(ch)
+        depth -= ch == ")" and depth > 0
+    top_level = "".join(top) if depth == 0 else ""
     if not last or "::" in last or _INTERACTIVE.search(top_level):  # other pseudo-elements; hover/focus-only rules
         return None
     last = re.sub(r":[\w-]+(\([^)]*\))?", "", last)  # :first-child, :not(…), …: apply anyway (fail closed)
@@ -324,7 +328,9 @@ class _Visible(HTMLParser):
         zooms = [float(m.group(1)) / (100 if m.group(2) == "%" else 1) for p_, v, _ in decls
                  if p_ == "zoom" and (m := _NUMBER.match(v)) and m.group(2) in ("", "%")]
         zoom = parent.zoom * (min(zooms) if zooms else 1.0)  # several zoom rules: the smallest wins (fail closed)
-        faint = font * zoom < MIN_FONT_PX or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
+        size = font * zoom
+        # 1e999 → inf, inf × 0 → nan: anything that isn't a normal number is treated as unreadable.
+        faint = not math.isfinite(size) or size < MIN_FONT_PX or size > 1e5 or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
         if tag not in VOID:
             self.stack.append(_State(tag, hidden, faint, font, color, bg, zoom))
             self.open[tag] = self.open.get(tag, 0) + 1
