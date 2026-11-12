@@ -208,8 +208,13 @@ def _rule(selector: str, body: str, order: int, alt_scheme: bool = False) -> _Ru
     selector = selector.strip()
     last = re.split(r"\s*[>+~]\s*|\s+", selector)[-1] if selector else ""
     last = re.sub(r"::?(first-line|first-letter)\b", "", last, flags=re.I)  # styles the element's own text
-    outside_not = re.sub(r":not\([^)]*\)", "", last, flags=re.I)  # ":not(:hover)" always applies
-    if not last or "::" in last or _INTERACTIVE.search(outside_not):  # other pseudo-elements; hover/focus-only rules
+    top_level = last  # drop :not()/:is()/:where()/:has() groups (innermost first): a :hover inside them
+    for _ in range(len(last)):  # doesn't make the rule hover-only, so the rule still applies
+        stripped = re.sub(r":[\w-]+\([^()]*\)", "", top_level)
+        if stripped == top_level:
+            break
+        top_level = stripped
+    if not last or "::" in last or _INTERACTIVE.search(top_level):  # other pseudo-elements; hover/focus-only rules
         return None
     last = re.sub(r":[\w-]+(\([^)]*\))?", "", last)  # :first-child, :not(…), …: apply anyway (fail closed)
     if not last:
@@ -229,6 +234,7 @@ class _State:
     font: float
     color: tuple
     bg: tuple
+    zoom: float = 1.0  # cumulative: a child's own font-size can't undo an ancestor's zoom
 
 
 class _Visible(HTMLParser):
@@ -244,7 +250,7 @@ class _Visible(HTMLParser):
         for r in rules or []:
             key = ("." + min(r.classes)) if r.classes else ("#" + min(r.ids)) if r.ids else (r.tag or "*")
             self.index.setdefault(key, []).append(r)
-        self.stack = [_State("#root", False, False, BASE_FONT_PX, (0, 0, 0, 1.0), (255, 255, 255, 1.0))]
+        self.stack = [_State("#root", False, False, BASE_FONT_PX, (0, 0, 0, 1.0), (255, 255, 255, 1.0), 1.0)]
         self.open: dict[str, int] = {}  # open elements per tag, so an unmatched end tag is skipped in O(1)
         self.elements, self.dropped = 0, False
 
@@ -315,12 +321,12 @@ class _Visible(HTMLParser):
                 color = c
             elif prop in {"background", "background-color"} and (c := _first_color(value)) and c[3] > 0:
                 bg = c
-        for prop, value, _ in decls:  # zoom scales everything inside, so it compounds into the effective size
-            if prop == "zoom" and (m := _NUMBER.match(value)) and m.group(2) in ("", "%"):
-                font *= float(m.group(1)) / (100 if m.group(2) == "%" else 1)
-        faint = font < MIN_FONT_PX or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
+        zooms = [float(m.group(1)) / (100 if m.group(2) == "%" else 1) for p_, v, _ in decls
+                 if p_ == "zoom" and (m := _NUMBER.match(v)) and m.group(2) in ("", "%")]
+        zoom = parent.zoom * (min(zooms) if zooms else 1.0)  # several zoom rules: the smallest wins (fail closed)
+        faint = font * zoom < MIN_FONT_PX or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
         if tag not in VOID:
-            self.stack.append(_State(tag, hidden, faint, font, color, bg))
+            self.stack.append(_State(tag, hidden, faint, font, color, bg, zoom))
             self.open[tag] = self.open.get(tag, 0) + 1
         if not hidden:
             self.out.append(self.get_starttag_text())

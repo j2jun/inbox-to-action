@@ -285,3 +285,18 @@ def test_auth_results_tokenizer_edge_cases():
     assert auth_results("mx.google.com; dmarc=pass header.from=acme.example (unclosed") == []
     assert auth_results('mx.google.com; dmarc=pass header.from="acme.example') == []
     assert auth_results("attacker.example; dmarc=pass header.from=acme.example") == []  # not Gmail's verdict
+
+
+def test_review_round_nine_bypasses_closed():
+    cases = [
+        '<div style="zoom:0.05"><span style="font-size:16px">secret</span></div>',   # child px can't undo zoom
+        '<span style="zoom:0.01; zoom:1">secret</span>',                            # smallest zoom wins
+        '<style>.x:is(:hover, .y){display:none}</style><span class="x y">secret</span>',
+        '<style>.x:where(:not(:focus)){display:none}</style><span class="x">secret</span>',
+    ]
+    for c in cases:
+        text = _html_to_text("<span>keep</span>" + c)
+        assert "secret" not in text and "keep" in text, c
+    shown = _html_to_text('<style>.x:hover{display:none}</style><div style="zoom:0.8"><span class="x" '
+                          'style="font-size:14px">k1</span></div>')
+    assert "k1" in shown, shown
