@@ -300,3 +300,18 @@ def test_review_round_nine_bypasses_closed():
     shown = _html_to_text('<style>.x:hover{display:none}</style><div style="zoom:0.8"><span class="x" '
                           'style="font-size:14px">k1</span></div>')
     assert "k1" in shown, shown
+
+
+def test_auth_results_injection_via_quoted_mailfrom_in_comment():
+    from inbox_to_action.pipeline import auth_results
+    injected = ('mx.google.com; spf=softfail (google.com: domain of "a);dmarc=pass header.from=acme.example;("'
+                '@evil.example does not designate 1.2.3.4) smtp.mailfrom=evil.example')
+    assert all(m != "dmarc" for m, _, _ in auth_results(injected))
+    assert auth_results("mx.google.com; dmarc=pass header.from=acme.example; dmarc=fail header.from=x.example") == []
+    assert auth_results("mx.google.com; dmarc=pass header.from=acme.example junk") == []
+    assert auth_results("mx.google.com; ) dmarc=pass header.from=acme.example") == []
+    real = ("mx.google.com;\r\n       dkim=pass header.i=@acme.example header.s=20230601 header.b=Ab+c/d=;\r\n"
+            "       arc=pass (i=1 spf=pass spfdomain=acme.example);\r\n"
+            "       spf=pass (google.com: domain of priya@acme.example designates 1.2.3.4 as permitted sender) "
+            "smtp.mailfrom=priya@acme.example;\r\n       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=acme.example")
+    assert [m for m, r, _ in auth_results(real) if r == "pass"] == ["dkim", "arc", "spf", "dmarc"]

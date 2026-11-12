@@ -70,6 +70,7 @@ def _trusted(email: Email, config: Config) -> bool:
 
 
 AUTHSERV_IDS = {"mx.google.com"}  # whose Authentication-Results count: the receiving server (Gmail)
+_AUTH_METHODS = {"dkim", "spf", "dmarc", "arc", "bimi", "iprev", "auth", "dkim-atps", "compauth", "dara"}
 
 
 def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
@@ -77,7 +78,8 @@ def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
 
     Tokenized character by character (RFC 8601): comments may nest to any depth and are dropped, quoted strings
     are kept as one word with their '=' and ';' neutralized, and ';' only splits outside both. An unterminated
-    quote or comment, or results from a server other than AUTHSERV_IDS, returns [] (fail closed).
+    quote or comment, a stray ')', any segment outside the strict grammar, two DMARC verdicts, or results from a
+    server other than AUTHSERV_IDS, returns [] (fail closed).
     """
     segments, current, depth, quoted, escaped = [], [], 0, False, False
     for ch in header:
@@ -88,21 +90,25 @@ def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
             continue
         if ch == "\\" and (quoted or depth):
             escaped = True
-        elif quoted:
+        elif quoted:  # quoted text is opaque at any depth: a ")" or ";" inside it ends nothing
             if ch == '"':
                 quoted = False
-                current.append('"')
+                if depth == 0:
+                    current.append('"')
             elif depth == 0:
                 current.append(ch if ch.isalnum() or ch in ".@_-" else "_")  # no '=', ';' or spaces survive
+        elif ch == '"':
+            quoted = True
+            if depth == 0:
+                current.append('"')
         elif ch == "(":
             depth += 1
-        elif ch == ")" and depth:
+        elif ch == ")":
+            if not depth:
+                return []  # stray ")": malformed, fail closed
             depth -= 1
         elif depth:
             continue
-        elif ch == '"':
-            quoted = True
-            current.append('"')
         elif ch == ";":
             segments.append("".join(current))
             current = []
@@ -117,13 +123,20 @@ def auth_results(header: str) -> list[tuple[str, str, dict[str, str]]]:
     results = []
     for segment in segments[1:]:
         words = segment.split()
-        if not words or not (m := re.fullmatch(r"([\w-]+)=([\w-]+)", words[0])):
-            continue
+        if not words:
+            continue  # trailing ";"
+        m = re.fullmatch(r"([a-z-]+)=([a-z]+)", words[0], re.I)
+        if not m or m.group(1).lower() not in _AUTH_METHODS:
+            return []  # anything unexpected: don't guess which part is real
         props = {}
         for w in words[1:]:
-            if pm := re.fullmatch(r"([\w.-]+)=\"?([\w.@-]+)\"?", w):
-                props[pm.group(1).lower()] = pm.group(2).lower()
+            pm = re.fullmatch(r"([a-z][\w-]*\.[\w-]+)=(\"[\w.@-]*\"|[^\s\"]+)", w, re.I)
+            if not pm:
+                return []
+            props[pm.group(1).lower()] = pm.group(2).strip('"').lower()
         results.append((m.group(1).lower(), m.group(2).lower(), props))
+    if sum(method == "dmarc" for method, _, _ in results) > 1:
+        return []  # one message has one DMARC verdict; two means something was injected
     return results
 
 
