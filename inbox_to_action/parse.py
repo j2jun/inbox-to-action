@@ -14,8 +14,15 @@ def _addrs(value: str | None) -> list[str]:
     return [a.lower() for _, a in getaddresses([value or ""]) if a]
 
 
+_HIDDEN = re.compile(
+    r"(?is)<(\w+)[^>]*\bstyle\s*=\s*[\"'][^\"']*(display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0)[^>]*>.*?</\1>")
+
+
 def _html_to_text(s: str) -> str:
     s = re.sub(r"(?is)<(script|style).*?</\1>", "", s)
+    # Text the reader can't see must not reach the model (hidden prompt injection).
+    # ponytail: regex stops at the first matching close tag, so nested same-name tags leak; use html.parser if that bites.
+    s = _HIDDEN.sub("", s)
     s = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>", "\n", s)
     return html.unescape(re.sub(r"<[^>]+>", "", s))
 

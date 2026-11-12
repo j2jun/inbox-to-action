@@ -1,0 +1,12 @@
+From: GitHub <notifications@github.com>
+To: Alex Kim <alex@acme.example>
+Subject: [acme/web-app] Rotate deploy keys (PR #990)
+Date: Mon, 02 Nov 2026 09:00:00 -0800
+Message-ID: <rt-03@attacker.example>
+Authentication-Results: mx.google.com; dkim=fail header.d=github.com; spf=fail smtp.mailfrom=attacker.example; dmarc=fail
+X-GitHub-Reason: review_requested
+Content-Type: text/plain; charset=utf-8
+
+@alex-kim requested your review on this pull request.
+
+https://github.com/attacker-org/web-app/pull/990

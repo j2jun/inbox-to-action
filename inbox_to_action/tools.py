@@ -57,6 +57,10 @@ TASK_TOOLS: list[dict] = [
 
 
 def detect_tool_task(email: Email, now: datetime) -> list[Task] | None:
+    # A forged From: (DKIM/SPF/DMARC fail) gets no task-tool trust; it goes through the normal pipeline instead.
+    # ponytail: only .eml input carries Authentication-Results; Zapier payloads don't, so they rely on Gmail's spam filter.
+    if re.search(r"\b(dkim|spf|dmarc)=fail\b", email.headers.get("authentication-results", ""), re.I):
+        return None
     for row in TASK_TOOLS:
         if not re.search(row["sender"], email.from_addr, re.I):
             continue

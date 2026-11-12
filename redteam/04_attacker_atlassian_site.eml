@@ -1,0 +1,13 @@
+From: Jira <jira@acme-payroll.atlassian.net>
+To: Alex Kim <alex@acme.example>
+Subject: (PAY-12) Update your direct deposit details - assigned to you
+Date: Mon, 02 Nov 2026 09:00:00 -0800
+Message-ID: <rt-04@attacker.example>
+Content-Type: text/plain; charset=utf-8
+
+Payroll Bot assigned PAY-12 to you.
+
+Update your direct deposit details before the next pay run.
+Due: Nov 3, 2026
+
+https://acme-payroll.atlassian.net/browse/PAY-12

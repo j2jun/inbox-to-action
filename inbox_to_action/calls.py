@@ -2,17 +2,20 @@
 import hashlib
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from .dates import parse_datetime_text
 from .ics import parse_ics
 from .models import Email, Task
 
+# Matched against "host/path" from the start, so "attacker.example/zoom.us/j/1" can't pose as Zoom.
+_SUB = r"^(?:[\w-]+\.)*"
 PLATFORMS: list[tuple[str, re.Pattern]] = [
-    ("Zoom", re.compile(r"zoom\.us/(j|my)/", re.I)),
-    ("Meet", re.compile(r"meet\.google\.com/", re.I)),
-    ("Teams", re.compile(r"teams\.microsoft\.com/l/meetup-join", re.I)),
-    ("Webex", re.compile(r"webex\.com/.+?(j\.php|/meet)", re.I)),
-    ("Other", re.compile(r"meet\.goto\.com/|gotomeeting\.com/|whereby\.com/|chime\.aws/|slack\.com/.*huddle", re.I)),
+    ("Zoom", re.compile(_SUB + r"zoom\.us/(j|my)/", re.I)),
+    ("Meet", re.compile(_SUB + r"meet\.google\.com/", re.I)),
+    ("Teams", re.compile(_SUB + r"teams\.microsoft\.com/l/meetup-join", re.I)),
+    ("Webex", re.compile(_SUB + r"webex\.com/.+?(j\.php|/meet)", re.I)),
+    ("Other", re.compile(_SUB + r"(meet\.goto\.com/|gotomeeting\.com/|whereby\.com/|chime\.aws/|slack\.com/.*huddle)", re.I)),
 ]
 _URL = re.compile(r"https?://[^\s<>\"')]+")
 _PHONE = re.compile(r"\+?1?[\s.-]*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}")
@@ -52,8 +55,10 @@ def detect_call(email: Email, now: datetime) -> Task | str | None:
     ev = parse_ics(email.ics, now.tzinfo) if email.ics else None
     platform, link = None, None
     for url in _URL.findall(email.body):
+        parts = urlsplit(url)
+        target = (parts.hostname or "") + parts.path
         for name, pattern in PLATFORMS:
-            if pattern.search(url):
+            if pattern.search(target):
                 platform, link = name, url
                 break
         if platform:
