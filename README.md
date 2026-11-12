@@ -169,6 +169,7 @@ Each task's note in TickTick shows the join link, the sender, the reason for its
 | `USER_EMAIL` | your Gmail address |
 | `VIP_EMAILS` | comma-separated important senders |
 | `JIRA_SITES` | comma-separated Jira Cloud site names you trust, e.g. `acme` for acme.atlassian.net; other sites get no Jira trust |
+| `TRUSTED_DOMAINS` | comma-separated domains whose AI tasks skip **Needs your OK**, e.g. your company domain. Never a public provider like `gmail.com` (VIP_EMAILS always skip it too) |
 | `TIMEZONE` | e.g. `America/Los_Angeles` |
 
 ### 3. Deploy
@@ -230,6 +231,6 @@ Offline, AI attacks run against an **obedient model** that follows any planted i
 
 **Attack success rate: 12/14 (86%) → 0/14 (0%)**, with 1/14 held for your OK. `tests/test_redteam.py` fails if any attack gets through again, and also checks that real newsletter styling (dark mode, buttons, small print) stays visible.
 
-**Needs your OK.** A model that reads attacker text can be talked into anything, so filtering alone can't stop #07. AI-extracted tasks from senders outside your domain who aren't VIPs arrive as *Review*: they sit at the top of the Today page with **Approve** / **Dismiss** and the sender's real address, and never reach your list on their own. Your own domain and VIPs go straight to *To do*, unless the mail failed DKIM/SPF/DMARC.
+**Needs your OK.** A model that reads attacker text can be talked into anything, so filtering alone can't stop #07. AI-extracted tasks from senders who aren't VIPs and aren't in `TRUSTED_DOMAINS` arrive as *Review*: they sit at the top of the Today page with **Approve** / **Dismiss** and the sender's real address, and never reach your list on their own. VIPs and trusted domains go straight to *To do*; when the email carries an `Authentication-Results` header, that also needs a DMARC pass or a DKIM pass for the sender's domain.
 
-**Still open (accepted):** the filter approximates CSS specificity, ignores pseudo-classes and can't see text inside images. Zapier payloads carry no authentication headers, so a forged own-domain sender there is trusted (Gmail's spam filter is the backstop). Asana, Trello and similar tools let anyone assign you a task. Five rounds of automated security review shaped the hidden-text filter (`inbox_to_action/visible.py`).
+**Still open (accepted):** the filter approximates CSS specificity, ignores pseudo-classes and can't see text inside images. Zapier payloads carry no authentication headers, so a forged VIP or trusted-domain sender there is trusted (Gmail's spam filter is the backstop). Asana, Trello and similar tools let anyone assign you a task. Five rounds of automated security review shaped the hidden-text filter (`inbox_to_action/visible.py`).

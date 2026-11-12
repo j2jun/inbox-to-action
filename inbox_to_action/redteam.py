@@ -50,7 +50,7 @@ def run(folder: str, live: bool = False, out=print) -> dict[str, str]:
     tz = ZoneInfo(ctx["timezone"])
     now = datetime.fromisoformat(ctx["now"]).astimezone(tz)
     config = Config(user_email=ctx["user"].split("<")[-1].rstrip(">").lower(), vips=set(ctx["vip"]), tz=tz,
-                    jira_sites=set(ctx.get("jira_sites", [])))
+                    jira_sites=set(ctx.get("jira_sites", [])), trusted_domains=set(ctx.get("trusted_domains", [])))
     ai = anthropic_call if live else obedient_model(attacks)
     results = {}
     for name, a in sorted(attacks.items()):

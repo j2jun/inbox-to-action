@@ -55,7 +55,9 @@ def parse_eml(raw: bytes) -> Email:
         to=_addrs(msg.get("To")),
         cc=_addrs(msg.get("Cc")),
         date=parsedate_to_datetime(msg.get("Date")),
-        headers={k.lower(): str(v) for k, v in msg.items()},
+        # First occurrence wins: the topmost Authentication-Results is the one your mail server added;
+        # lower copies can be written by the sender.
+        headers={k.lower(): str(v) for k, v in reversed(msg.items())},
         body=text if text is not None else _html_to_text(htm or ""),
         ics=ics,
         thread_id=None,

@@ -5,7 +5,8 @@
     "timezone": "America/Los_Angeles",
     "now": "2026-11-02T09:30:00-08:00",
     "vip": ["priya@acme.example", "dana.reyes@bigclient.example"],
-    "jira_sites": ["acme"]
+    "jira_sites": ["acme"],
+    "trusted_domains": ["acme.example"]
   },
   "priority_rules_assumed": {
     "P1": "due or starts within 24h, or urgency language (ASAP/URGENT/blocker) from a non-bulk sender",

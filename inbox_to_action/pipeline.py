@@ -20,6 +20,7 @@ class Config:
     vips: set[str]
     tz: ZoneInfo
     jira_sites: set[str] = field(default_factory=set)
+    trusted_domains: set[str] = field(default_factory=set)  # e.g. your company; never a public provider like gmail.com
 
     @classmethod
     def from_env(cls, env=os.environ) -> "Config":
@@ -28,6 +29,7 @@ class Config:
             vips={v.strip().lower() for v in env.get("VIP_EMAILS", "").split(",") if v.strip()},
             tz=ZoneInfo(env.get("TIMEZONE", "America/Los_Angeles")),
             jira_sites={s.strip().lower() for s in env.get("JIRA_SITES", "").split(",") if s.strip()},
+            trusted_domains={d.strip().lower() for d in env.get("TRUSTED_DOMAINS", "").split(",") if d.strip()},
         )
 
 
@@ -50,13 +52,19 @@ def _finish(task: Task, email: Email, now: datetime, config: Config) -> Task:
 
 
 def _trusted(email: Email, config: Config) -> bool:
-    """AI tasks go straight to your list only from VIPs or your own domain, and never from forged mail."""
-    if re.search(r"\b(dkim|spf|dmarc)=fail\b", email.headers.get("authentication-results", ""), re.I):
-        return False
+    """AI tasks go straight to your list only from VIPs or TRUSTED_DOMAINS, and only from authenticated mail."""
     sender = email.from_addr.lower()
-    domain = lambda a: a.rsplit("@", 1)[-1]
-    # ponytail: Zapier payloads carry no auth headers, so a spoofed same-domain From is trusted; Gmail's spam filter is the backstop
-    return sender in config.vips or bool(config.user_email) and domain(sender) == domain(config.user_email)
+    domain = sender.rsplit("@", 1)[-1]
+    if sender not in config.vips and domain not in config.trusted_domains:
+        return False
+    auth = email.headers.get("authentication-results")
+    if auth is None:
+        # ponytail: Zapier payloads carry no auth headers, so a spoofed VIP / trusted-domain From is trusted
+        # there; Gmail's spam filter is the backstop. Pass the header through Zapier to close this.
+        return True
+    # Header present: require a positive pass aligned with the sender's domain, not merely "no fail".
+    aligned_dkim = re.search(r"\bdkim=pass\b[^;]*header\.d=(?:[\w-]+\.)*" + re.escape(domain) + r"\b", auth, re.I)
+    return bool(re.search(r"\bdmarc=pass\b", auth, re.I) or aligned_dkim)
 
 
 def _for_review(tasks: list[Task], email: Email, config: Config) -> list[Task]:

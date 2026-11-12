@@ -170,12 +170,26 @@ def test_outside_sender_ai_tasks_wait_for_review(load):
     from inbox_to_action.store import MemoryStore
     stub = lambda req: {"content": [{"type": "tool_use", "name": "record_tasks", "input": {"tasks": [
         {"title": "Send the deck", "type": "Action", "due": None, "platform": None, "phone": None}]}}]}
-    config = Config("alex@acme.example", {"dana.reyes@bigclient.example"}, NOW.tzinfo)
-    status = lambda **kw: process(_email(**kw), MemoryStore(), NOW, config, stub).created[0].status
-    assert status(frm="priya@acme.example") == "To do"                 # same domain
+    config = Config("alex@acme.example", {"dana.reyes@bigclient.example"}, NOW.tzinfo, trusted_domains={"acme.example"})
+    status = lambda cfg=config, **kw: process(_email(**kw), MemoryStore(), NOW, cfg, stub).created[0].status
+    assert status(frm="priya@acme.example") == "To do"                 # trusted domain (no auth header: Zapier)
     assert status(frm="dana.reyes@bigclient.example") == "To do"       # VIP
     assert status(frm="stranger@elsewhere.example") == "Review"        # outside sender
-    assert status(frm="priya@acme.example", auth="dkim=fail") == "Review"  # forged own-domain mail
+    assert status(frm="priya@acme.example", auth="mx.google.com; dkim=fail") == "Review"   # forged
+    assert status(frm="priya@acme.example", auth="mx.google.com; spf=none") == "Review"    # no positive pass
+    assert status(frm="priya@acme.example", auth="mx.google.com; dkim=pass header.d=acme.example") == "To do"
+    assert status(frm="priya@acme.example", auth="mx.google.com; dkim=pass header.d=evil.example") == "Review"
+    # A Gmail user must not trust every @gmail.com stranger: same-domain trust only comes from TRUSTED_DOMAINS.
+    gmail = Config("alex@gmail.com", set(), NOW.tzinfo)
+    assert status(cfg=gmail, frm="stranger@gmail.com") == "Review"
+
+
+def test_topmost_authentication_results_wins():
+    from inbox_to_action.parse import parse_eml
+    raw = (b"Authentication-Results: mx.google.com; dmarc=fail\n"
+           b"Authentication-Results: attacker.example; dmarc=pass\n"
+           b"From: priya@acme.example\nTo: alex@acme.example\nSubject: x\nDate: Mon, 02 Nov 2026 09:00:00 -0800\n\nhi\n")
+    assert "dmarc=fail" in parse_eml(raw).headers["authentication-results"]
 
 
 def _email(frm, auth=""):

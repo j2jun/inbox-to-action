@@ -22,7 +22,7 @@ PUBLIC = ROOT / "public"
 
 def build():
     tz = ZoneInfo("America/Los_Angeles")
-    config = Config("alex@acme.example", {"priya@acme.example", "dana.reyes@bigclient.example"}, tz, {"acme"})
+    config = Config("alex@acme.example", {"priya@acme.example", "dana.reyes@bigclient.example"}, tz, {"acme"}, {"acme.example"})
     store = MemoryStore()
     stub = make_stub_call(ROOT / "tests" / "fixtures" / "ai")
     sample_now = datetime(2026, 11, 2, 9, 30, tzinfo=tz)
