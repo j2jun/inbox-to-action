@@ -105,3 +105,8 @@ def test_many_unclosed_openers_is_fast():
     _html_to_text("<textarea " * 20_000 + "<p>x</p>")
     _html_to_text("<title>" * 20_000)
     assert time.perf_counter() - start < 2
+
+
+def test_plaintext_cannot_close_hidden_ancestor():
+    text = _html_to_text("<p>keep</p><div hidden><plaintext></div>secret")
+    assert "secret" not in text and "keep" in text

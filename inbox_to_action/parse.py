@@ -98,6 +98,9 @@ class _VisibleHTML(HTMLParser):
 
 def _visible(s: str) -> str:
     # ponytail: inline styles and the hidden attribute only; class-based CSS and white-on-white text still pass.
+    # Everything after <plaintext> is raw text to a browser (no tag ever closes again), so a later "</div>"
+    # can't end a hidden ancestor. Obsolete tag: drop the rest rather than model it.
+    s = re.split(r"(?i)<plaintext\b", s, maxsplit=1)[0]
     p = _VisibleHTML()
     p.feed(s)
     # No close(): it would flush an unfinished trailing tag ("<div style=...secret") as visible text.
