@@ -10,6 +10,7 @@ Walks the tree like a browser would, carrying each element's inherited font size
 When a rule can't be evaluated (calc(), var()) it fails closed. Known limits: specificity is approximate,
 pseudo-classes (:hover, :nth-child) are ignored, images and background-images aren't seen.
 """
+import colorsys
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -28,7 +29,10 @@ _REL = {"em": 1, "%": 0.01, "ex": 0.5, "ch": 0.5}  # × the parent's font size
 _FONT_WORDS = {"xx-small": 9, "x-small": 10, "small": 13, "medium": 16, "large": 18, "x-large": 24,
                "xx-large": 32, "xxx-large": 48}
 _BOX_PROPS = {"height", "width", "max-height", "max-width", "line-height"}
-_STYLE_PROPS = {"font-size", "color", "-webkit-text-fill-color", "background", "background-color"}
+_STYLE_PROPS = {"font-size", "font", "color", "-webkit-text-fill-color", "background", "background-color"}
+MAX_DEPTH, MAX_ELEMENTS = 512, 20_000  # past either, the rest of the email is dropped (fail closed)
+_INTERACTIVE = re.compile(r":(hover|focus|focus-within|focus-visible|active|visited|target|checked)\b", re.I)
+_FAINT = (0, 0, 0, 0.0)  # a color we can't read is treated as invisible
 MAX_CASCADE_RULES = 100  # font/color come from the last N matching rules; hiding checks every rule
 
 # Named colors: the light ones are the white-on-white risk, the dark ones the black-on-black risk.
@@ -89,7 +93,14 @@ def _color(value: str) -> tuple[float, float, float, float] | None:
         a = m.group(4)
         alpha = 1.0 if a is None else float(a[:-1]) / 100 if a.endswith("%") else float(a)
         return (*ch, alpha)
-    return None  # hsl(), unknown names, currentcolor, inherit: caller keeps the inherited color
+    if m := re.fullmatch(r"hsla?\(\s*([-\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%(?:[\s,/]+([\d.]+%?))?\s*\)", v):
+        h, sat, light = float(m.group(1)) % 360 / 360, float(m.group(2)) / 100, float(m.group(3)) / 100
+        r, g, b = colorsys.hls_to_rgb(h, light, sat)
+        a = m.group(4)
+        return (r * 255, g * 255, b * 255, 1.0 if a is None else float(a[:-1]) / 100 if a.endswith("%") else float(a))
+    if "(" in v:
+        return _FAINT  # lab(), oklch(), color(), …: can't check contrast, fail closed
+    return None  # unknown names, currentcolor, inherit: caller keeps the inherited color
 
 
 def _first_color(value: str):
@@ -123,6 +134,9 @@ def _hides(prop: str, value: str) -> bool:
                 "transform", "translate", "scale"} | _BOX_PROPS:
         if _COMPUTED.search(value):
             return True
+    if prop == "zoom":
+        m = _NUMBER.match(value)
+        return bool(m) and float(m.group(1)) / (100 if m.group(2) == "%" else 1) <= 0.05
     if prop == "opacity":
         m = _NUMBER.match(value)
         return bool(m) and (float(m.group(1)) / (100 if m.group(2) == "%" else 1)) <= 0.05
@@ -190,8 +204,11 @@ def _rules(css: str) -> list[_Rule]:
 def _rule(selector: str, body: str, order: int, alt_scheme: bool = False) -> _Rule | None:
     selector = selector.strip()
     last = re.split(r"\s*[>+~]\s*|\s+", selector)[-1] if selector else ""
-    if not last or ":" in last:  # pseudo-classes only apply on hover/focus/etc.
+    if not last or "::" in last or _INTERACTIVE.search(last):  # pseudo-elements; rules that need hover/focus
         return None
+    last = re.sub(r":[\w-]+(\([^)]*\))?", "", last)  # :first-child, :not(…), …: apply anyway (fail closed)
+    if not last:
+        last = "*"
     tag = re.match(r"[a-z][\w-]*", last, re.I)
     spec = (selector.count("#"), len(re.findall(r"[.\[:]", selector)), len(re.findall(r"(?:^|[\s>+~])[a-z]", selector, re.I)))
     return _Rule(tag.group(0).lower() if tag else None, set(re.findall(r"#([\w-]+)", last)),
@@ -223,6 +240,8 @@ class _Visible(HTMLParser):
             key = ("." + min(r.classes)) if r.classes else ("#" + min(r.ids)) if r.ids else (r.tag or "*")
             self.index.setdefault(key, []).append(r)
         self.stack = [_State("#root", False, False, BASE_FONT_PX, (0, 0, 0, 1.0), (255, 255, 255, 1.0))]
+        self.open: dict[str, int] = {}  # open elements per tag, so an unmatched end tag is skipped in O(1)
+        self.elements, self.dropped = 0, False
 
     def _cascade(self, tag: str, attrs: list) -> tuple[bool, list[tuple[str, str, bool]]]:
         ids = {v for n, v in attrs if n == "id" and v}
@@ -246,7 +265,11 @@ class _Visible(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag in INVISIBLE_TEXT:
             self.raw = tag
-        if self.rules is None:  # first pass: only collecting <style> text
+        if self.rules is None or self.dropped:  # first pass only collects <style> text
+            return
+        self.elements += 1
+        if self.elements > MAX_ELEMENTS or len(self.stack) > MAX_DEPTH:
+            self.dropped = True
             return
         parent = self.stack[-1]
         sheet_hides, decls = self._cascade(tag, attrs)
@@ -268,6 +291,19 @@ class _Visible(HTMLParser):
                     font = parent.font * (0.83 if value == "smaller" else 1.2)
                 elif (px := _length(value, parent.font)) is not None:
                     font = px
+            elif prop == "font":  # shorthand: "italic bold 12px/1.4 Arial" or the "0/0 a" hiding trick
+                if _COMPUTED.search(value):
+                    hidden = True
+                for tok in re.split(r"\s+", value):
+                    size = tok.split("/")[0]
+                    if size in _FONT_WORDS:
+                        font = _FONT_WORDS[size]
+                        break
+                    m = _NUMBER.match(size)
+                    if m and (m.group(2) or float(m.group(1)) == 0 or "/" in tok):  # 700 is a weight, 12px a size
+                        font = _length(size, parent.font) if m.group(2) != "rem" else float(m.group(1)) * BASE_FONT_PX
+                        font = font if font is not None else parent.font
+                        break
             elif prop in {"color", "-webkit-text-fill-color"} and (c := _color(value)):
                 color = c
             elif prop in {"background", "background-color"} and (c := _first_color(value)) and c[3] > 0:
@@ -275,6 +311,7 @@ class _Visible(HTMLParser):
         faint = font < MIN_FONT_PX or color[3] <= 0.05 or _contrast(color, bg) < MIN_CONTRAST
         if tag not in VOID:
             self.stack.append(_State(tag, hidden, faint, font, color, bg))
+            self.open[tag] = self.open.get(tag, 0) + 1
         if not hidden:
             self.out.append(self.get_starttag_text())
 
@@ -285,9 +322,13 @@ class _Visible(HTMLParser):
     def handle_endtag(self, tag):
         if tag == self.raw:
             self.raw = None
+        if self.dropped or not self.open.get(tag):
+            return
         for i in range(len(self.stack) - 1, 0, -1):  # close the nearest open element with this name
             if self.stack[i].tag == tag:
                 closed = self.stack[i]
+                for st in self.stack[i:]:
+                    self.open[st.tag] -= 1
                 del self.stack[i:]
                 if not closed.hidden:
                     self.out.append(f"</{tag}>")
@@ -297,7 +338,7 @@ class _Visible(HTMLParser):
         if self.rules is None:
             if self.raw == "style":
                 self.css.append(data)
-        elif not self.raw and not self.stack[-1].hidden and not self.stack[-1].faint:
+        elif not self.dropped and not self.raw and not self.stack[-1].hidden and not self.stack[-1].faint:
             self.out.append(data)
 
     handle_entityref = lambda self, name: self.handle_data(f"&{name};")

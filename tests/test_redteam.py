@@ -212,3 +212,30 @@ def test_review_round_trip_through_web_and_stores():
     t = store.create(Task("Buy gift cards", "Action", status="Review"))
     assert [x.title for x in store.list_open()] == ["Buy gift cards"]
     assert store.update(t.page_id, status="Cancelled") and store.list_open() == []
+
+
+def test_review_round_six_bypasses_closed():
+    cases = [
+        '<style>p:first-child{display:none}</style><div><p>secret</p></div>',
+        '<style>.x:not(.y){visibility:hidden}</style><span class="x">secret</span>',
+        '<span style="font:0/0 a">secret</span>',
+        '<span style="font: italic bold 1px Arial">secret</span>',
+        '<span style="zoom:0">secret</span>',
+        '<span style="color:oklch(99% 0 0)">secret</span>',
+        '<span style="color:hsl(0, 0%, 99%)">secret</span>',
+    ]
+    for c in cases:
+        text = _html_to_text("<span>keep</span>" + c)
+        assert "secret" not in text and "keep" in text, c
+    shown = _html_to_text('<style>a:hover{display:none}</style><a>k1</a><span style="font:700 14px Arial">k2</span>'
+                          '<span style="color:hsl(210, 80%, 30%)">k3</span>')
+    assert all(k in shown for k in ("k1", "k2", "k3")), shown
+
+
+def test_deep_nesting_and_unmatched_end_tags_are_fast_and_fail_closed():
+    import time
+    start = time.perf_counter()
+    text = _html_to_text("<p>keep</p>" + "<div>" * 50_000 + "secret" + "</span>" * 50_000)
+    assert "secret" not in text and "keep" in text
+    _html_to_text("<b>x</b>" * 30_000)
+    assert time.perf_counter() - start < 2
